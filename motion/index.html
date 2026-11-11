@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Clayhouse Motion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* TV screen: the 3D room fills it; a slim HUD on top; the pairing card floats over the room until a phone joins */
+:root{ --bg:#070a1c; --panel:rgba(16,20,48,.86); --line:#2a3166; --fg:#eef1ff; --dim:#9aa3d6; --mint:#5cf2cf; --pink:#ff4fa8; --amber:#ffb84d;
+  --disp:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif; color-scheme:dark }
+*{ box-sizing:border-box } [hidden]{ display:none!important }
+html,body{ height:100%; margin:0; background:var(--bg); color:var(--fg); font-family:var(--body); overflow:hidden }
+canvas#gl{ position:fixed; inset:0; width:100%; height:100%; display:block }
+.hud{ position:fixed; left:0; right:0; top:0; display:flex; justify-content:space-between; align-items:flex-start; gap:16px;
+  padding:max(16px,env(safe-area-inset-top)) max(22px,env(safe-area-inset-right)) 0 max(22px,env(safe-area-inset-left)); pointer-events:none }
+.hud .game{ font-family:var(--disp); font-weight:700; font-size:clamp(20px,2.4vw,34px); letter-spacing:.01em }
+.hud .game b{ color:var(--mint) }
+.stats{ display:flex; gap:clamp(14px,2.4vw,36px); font-variant-numeric:tabular-nums }
+.stat{ display:flex; flex-direction:column; align-items:flex-end; gap:2px }
+.stat small{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim) }
+.stat span{ font-family:var(--disp); font-weight:700; font-size:clamp(22px,2.8vw,40px) }
+#combo span{ color:var(--pink) }
+.card{ position:fixed; background:var(--panel); border:1px solid var(--line); border-radius:22px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px) }
+#pair{ left:50%; top:50%; transform:translate(-50%,-50%); width:min(760px,calc(100% - 32px)); padding:clamp(18px,3vw,34px); display:grid; grid-template-columns:auto 1fr; gap:clamp(16px,3vw,34px); align-items:center }
+#pair.corner{ left:auto; top:auto; right:max(18px,env(safe-area-inset-right)); bottom:max(18px,env(safe-area-inset-bottom)); transform:none; width:auto; padding:12px 16px; grid-template-columns:auto auto; gap:12px; border-radius:16px }
+#pair.corner #qr{ width:64px; height:64px; padding:5px; border-radius:8px }
+#pair.corner .big, #pair.corner .how, #pair.corner .btns, #pair.corner h1 { display:none }
+#pair.corner .mini{ display:block }
+#qr{ width:clamp(150px,22vw,220px); height:clamp(150px,22vw,220px); background:#fff; border-radius:16px; padding:10px; display:grid; place-items:center }
+#qr svg{ width:100%; height:100% }
+#pair h1{ font-family:var(--disp); font-size:clamp(22px,3vw,36px); margin:0 0 8px; line-height:1.1; text-wrap:balance }
+.big{ font-family:var(--disp); font-weight:700; font-size:clamp(46px,7vw,84px); letter-spacing:.18em; color:var(--mint); line-height:1 }
+.how{ color:var(--dim); line-height:1.55; margin:12px 0 0; font-size:15px; max-width:44ch }
+.how code{ color:var(--fg); font-family:var(--body); word-break:break-all }
+.mini{ display:none; font-size:13px; color:var(--dim); line-height:1.4 } .mini b{ color:var(--mint); font-family:var(--disp); letter-spacing:.14em; font-size:18px }
+.btns{ display:flex; flex-wrap:wrap; gap:10px; margin-top:16px }
+button{ font:600 15px var(--body); border:0; border-radius:12px; padding:12px 16px; background:var(--mint); color:#07101c; cursor:pointer }
+button.ghost{ background:transparent; color:var(--fg); border:1px solid var(--line) }
+button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
+#end{ left:50%; top:50%; transform:translate(-50%,-50%); padding:clamp(22px,4vw,40px); text-align:center; width:min(520px,calc(100% - 32px)) }
+#end h2{ font-family:var(--disp); font-size:clamp(28px,4vw,48px); margin:0 }
+#end .score{ font-family:var(--disp); font-weight:700; font-size:clamp(54px,8vw,96px); color:var(--mint); line-height:1.05; font-variant-numeric:tabular-nums }
+#end p{ color:var(--dim); margin:6px 0 18px }
+#end .btns{ justify-content:center }
+#toast{ position:fixed; left:50%; bottom:max(26px,env(safe-area-inset-bottom)); transform:translateX(-50%); font-size:15px; color:var(--dim); text-align:center; pointer-events:none; max-width:90vw }
+@media (max-width:620px){ #pair{ grid-template-columns:1fr; justify-items:center; text-align:center } .how{ margin-inline:auto } .btns{ justify-content:center } }
+@media (prefers-reduced-motion:reduce){ * { transition:none!important } }
+</style>
+</head><body>
+<canvas id="gl"></canvas>
+<div class="hud">
+  <div class="game" id="gameName">Clay<b>house</b> Motion</div>
+  <div class="stats" id="stats" hidden>
+    <div class="stat" id="combo"><small>Combo</small><span id="comboV">0</span></div>
+    <div class="stat"><small>Score</small><span id="scoreV">0</span></div>
+    <div class="stat"><small id="timeL">Time</small><span id="timeV">60</span></div>
+  </div>
+</div>
+
+<div id="pair" class="card">
+  <div id="qr" aria-label="QR code that opens the phone controller"></div>
+  <div>
+    <h1>Scan with your phone to use it as the controller</h1>
+    <div class="big" id="codeBig">----</div>
+    <p class="how">Or open <code id="padUrl"></code> on your phone and type the four letters. Hold the phone, point the top of it at this screen, and tap Center.</p>
+    <div class="mini">Phone code <b id="codeMini">----</b><br><span id="phoneState">Waiting for a phone</span></div>
+    <div class="btns"><button id="soundBtn">Turn on sound</button><button id="mouseBtn" class="ghost">Play with the mouse instead</button></div>
+  </div>
+</div>
+
+<div id="end" class="card" hidden>
+  <h2 id="endTitle">Time!</h2>
+  <div class="score" id="endScore">0</div>
+  <p id="endNote"></p>
+  <div class="btns"><button id="againBtn">Play again</button><button id="menuBtn" class="ghost">Pick another game</button></div>
+</div>
+<div id="toast"></div>
+
+<script src="lib/three.min.js"></script>
+<script src="lib/peerjs.min.js"></script>
+<script src="lib/qrcode.js"></script>
+<script src="link.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const V3 = THREE.Vector3, Q = THREE.Quaternion;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const ease = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+const PAD_HOME = 'https://wuvvstudios.github.io/clayhouse-test/motion/pad.html';   // where the phone page lives once it's hosted
+
+// ---------------------------------------------------------------- renderer, camera, the room
+const canvas = $('gl');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050716);
+scene.fog = new THREE.Fog(0x050716, 9, 30);
+const cam = new THREE.PerspectiveCamera(62, 16 / 9, 0.03, 80);
+const EYE = new V3(0, 1.6, 0); cam.position.copy(EYE); cam.lookAt(0, 1.45, -5);
+function resize(){ const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+
+scene.add(new THREE.HemisphereLight(0x8fa2ff, 0x140a24, 0.55));
+const key = new THREE.DirectionalLight(0xffffff, 0.6); key.position.set(2, 6, 3); scene.add(key);
+
+// The Skydeck: a station observation room. Floor with light seams, ribbed walls with light strips, a huge window onto a planet.
+const room = new THREE.Group(); scene.add(room);
+(function buildRoom(){
+  const W = 9, L = 26, H = 5.2;
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x0d1130, roughness: 0.35, metalness: 0.4 });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, L), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.z = -L / 2 + 2; room.add(floor);
+  const seam = new THREE.MeshBasicMaterial({ color: 0x2b3a8a });
+  for (let i = 0; i < 13; i++){ const s = new THREE.Mesh(new THREE.PlaneGeometry(W, 0.03), seam); s.rotation.x = -Math.PI / 2; s.position.set(0, 0.002, 2 - i * 2); room.add(s); }
+  for (const x of [-1.6, 1.6]){ const s = new THREE.Mesh(new THREE.PlaneGeometry(0.05, L), new THREE.MeshBasicMaterial({ color: 0x5cf2cf })); s.rotation.x = -Math.PI / 2; s.position.set(x, 0.003, -L / 2 + 2); room.add(s); }
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(W, L), new THREE.MeshStandardMaterial({ color: 0x0a0d26, roughness: 0.8 })); ceil.rotation.x = Math.PI / 2; ceil.position.set(0, H, -L / 2 + 2); room.add(ceil);
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x141a44, roughness: 0.55, metalness: 0.3 });
+  const ribMat = new THREE.MeshStandardMaterial({ color: 0x1f2763, roughness: 0.4, metalness: 0.5 });
+  const stripA = new THREE.MeshBasicMaterial({ color: 0x5cf2cf }), stripB = new THREE.MeshBasicMaterial({ color: 0xff4fa8 });
+  for (const sx of [-1, 1]){
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(L, H), wallMat); wall.rotation.y = -sx * Math.PI / 2; wall.position.set(sx * W / 2, H / 2, -L / 2 + 2); room.add(wall);
+    for (let i = 0; i < 9; i++){
+      const z = 1 - i * 3;
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(0.4, H, 0.35), ribMat); rib.position.set(sx * (W / 2 - 0.2), H / 2, z); room.add(rib);
+      const st = new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.6, 0.06), i % 2 ? stripB : stripA); st.position.set(sx * (W / 2 - 0.42), 1.9, z); room.add(st);
+      const cr = new THREE.Mesh(new THREE.BoxGeometry(W, 0.25, 0.3), ribMat); cr.position.set(0, H - 0.12, z); room.add(cr);
+      const cl = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.04, 0.12), stripA); cl.position.set(0, H - 0.26, z); room.add(cl);
+    }
+  }
+  // the window wall with a planet and stars beyond
+  const far = -L + 2;
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(W, H, 0.3), ribMat); frame.position.set(0, H / 2, far - 0.2);
+  room.add(frame);
+  const space = document.createElement('canvas'); space.width = 1024; space.height = 512; const g = space.getContext('2d');
+  const sky = g.createLinearGradient(0, 0, 0, 512); sky.addColorStop(0, '#02030b'); sky.addColorStop(1, '#0b0730'); g.fillStyle = sky; g.fillRect(0, 0, 1024, 512);
+  for (let i = 0; i < 700; i++){ const r = Math.random(); g.fillStyle = `rgba(255,255,255,${0.25 + r * 0.75})`; g.fillRect(Math.random() * 1024, Math.random() * 512, r > 0.97 ? 2 : 1, r > 0.97 ? 2 : 1); }
+  const neb = g.createRadialGradient(260, 160, 10, 260, 160, 260); neb.addColorStop(0, 'rgba(255,79,168,.28)'); neb.addColorStop(1, 'rgba(255,79,168,0)'); g.fillStyle = neb; g.fillRect(0, 0, 1024, 512);
+  const pl = g.createRadialGradient(700, 640, 120, 760, 700, 420); pl.addColorStop(0, '#5fd3ff'); pl.addColorStop(0.55, '#1d63b8'); pl.addColorStop(0.9, '#0a2a6b'); pl.addColorStop(1, 'rgba(10,42,107,0)');
+  g.fillStyle = pl; g.beginPath(); g.arc(760, 700, 420, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(140,220,255,.55)'; g.lineWidth = 6; g.beginPath(); g.arc(760, 700, 418, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
+  const tex = new THREE.CanvasTexture(space); tex.encoding = THREE.sRGBEncoding;
+  const win = new THREE.Mesh(new THREE.PlaneGeometry(W - 1.2, H - 1.0), new THREE.MeshBasicMaterial({ map: tex, fog: false })); win.position.set(0, H / 2, far - 0.04); room.add(win);
+  for (const x of [-1.5, 1.5]){ const m = new THREE.Mesh(new THREE.BoxGeometry(0.12, H - 1, 0.1), ribMat); m.position.set(x, H / 2, far); room.add(m); }
+})();
+
+// ---------------------------------------------------------------- glow sprites, sparks, sound
+const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.3, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+const NSP = 260, spPos = new Float32Array(NSP * 3), spCol = new Float32Array(NSP * 3), spVel = new Float32Array(NSP * 3), spLife = new Float32Array(NSP);
+const spGeo = new THREE.BufferGeometry(); spGeo.setAttribute('position', new THREE.BufferAttribute(spPos, 3)); spGeo.setAttribute('color', new THREE.BufferAttribute(spCol, 3));
+const sparks = new THREE.Points(spGeo, new THREE.PointsMaterial({ size: 0.06, map: glowTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); sparks.frustumCulled = false; scene.add(sparks);
+let spNext = 0;
+function burst(p, color, n, speed){ const c = new THREE.Color(color);
+  for (let k = 0; k < n; k++){ const i = spNext; spNext = (spNext + 1) % NSP; const a = Math.random() * Math.PI * 2, b = Math.acos(2 * Math.random() - 1), s = speed * (0.4 + Math.random());
+    spPos[i*3] = p.x; spPos[i*3+1] = p.y; spPos[i*3+2] = p.z; spVel[i*3] = Math.sin(b) * Math.cos(a) * s; spVel[i*3+1] = Math.cos(b) * s; spVel[i*3+2] = Math.sin(b) * Math.sin(a) * s;
+    spLife[i] = 0.5 + Math.random() * 0.4; const w = Math.random() < 0.3 ? 1 : 0; spCol[i*3] = c.r + (1 - c.r) * w; spCol[i*3+1] = c.g + (1 - c.g) * w; spCol[i*3+2] = c.b + (1 - c.b) * w; } }
+function sparkFrame(dt){ for (let i = 0; i < NSP; i++){ if (spLife[i] <= 0){ spPos[i*3+1] = -99; continue; } spLife[i] -= dt; spVel[i*3+1] -= 5 * dt;
+  spPos[i*3] += spVel[i*3] * dt; spPos[i*3+1] += spVel[i*3+1] * dt; spPos[i*3+2] += spVel[i*3+2] * dt; const f = Math.exp(-3.2 * dt); spCol[i*3] *= f; spCol[i*3+1] *= f; spCol[i*3+2] *= f; }
+  spGeo.attributes.position.needsUpdate = true; spGeo.attributes.color.needsUpdate = true; }
+
+// sound: everything is made live, nothing to load. Browsers allow it after one click on this screen.
+const Snd = (() => {
+  let ac = null, out = null, nb = null, hum = null;
+  function init(){ if (ac) { if (ac.state === 'suspended') ac.resume(); return true; }
+    try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { return false; }
+    out = ac.createGain(); out.gain.value = 0.8; const comp = ac.createDynamicsCompressor(); out.connect(comp); comp.connect(ac.destination);
+    nb = ac.createBuffer(1, ac.sampleRate, ac.sampleRate); const d = nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return true; }
+  const on = () => ac && ac.state === 'running';
+  function env(g, t, a, d, p){ g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(p, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
+  function noise(f, q, d, p, type, sweepTo){ if (!on()) return; const t = ac.currentTime, s = ac.createBufferSource(); s.buffer = nb; const fl = ac.createBiquadFilter(); fl.type = type || 'bandpass'; fl.frequency.setValueAtTime(f, t); if (sweepTo) fl.frequency.exponentialRampToValueAtTime(sweepTo, t + d); fl.Q.value = q;
+    const g = ac.createGain(); env(g, t, 0.004, d, p); s.connect(fl); fl.connect(g); g.connect(out); s.start(t, Math.random() * 0.5); s.stop(t + d + 0.05); }
+  function tone(f, d, p, type, to){ if (!on()) return; const t = ac.currentTime, o = ac.createOscillator(); o.type = type || 'sine'; o.frequency.setValueAtTime(f, t); if (to) o.frequency.exponentialRampToValueAtTime(to, t + d);
+    const g = ac.createGain(); env(g, t, 0.005, d, p); o.connect(g); g.connect(out); o.start(t); o.stop(t + d + 0.05); }
+  return {
+    init, on,
+    humStart(){ if (!on() || hum) return; const o1 = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain(), fl = ac.createBiquadFilter();
+      o1.type = 'sawtooth'; o1.frequency.value = 82; o2.type = 'sawtooth'; o2.frequency.value = 83.5; fl.type = 'lowpass'; fl.frequency.value = 380; g.gain.value = 0.0001;
+      o1.connect(fl); o2.connect(fl); fl.connect(g); g.connect(out); o1.start(); o2.start(); hum = { o1, o2, g, fl }; g.gain.exponentialRampToValueAtTime(0.08, ac.currentTime + 0.4); tone(180, 0.35, 0.18, 'sawtooth', 60); },
+    humSet(speed){ if (!hum) return; const t = ac.currentTime, k = clamp(speed / 9, 0, 1); hum.g.gain.setTargetAtTime(0.07 + k * 0.17, t, 0.05); hum.fl.frequency.setTargetAtTime(380 + k * 1500, t, 0.05); hum.o1.frequency.setTargetAtTime(82 + k * 30, t, 0.05); hum.o2.frequency.setTargetAtTime(83.5 + k * 32, t, 0.05); },
+    humStop(){ if (!hum) return; const h = hum; hum = null; h.g.gain.setTargetAtTime(0.0001, ac.currentTime, 0.08); setTimeout(() => { h.o1.stop(); h.o2.stop(); }, 400); },
+    whoosh(k){ noise(900 + k * 900, 0.8, 0.22, 0.12 + 0.15 * k, 'bandpass', 300); },
+    slice(){ noise(3200, 1.2, 0.18, 0.35, 'bandpass', 900); tone(520, 0.2, 0.18, 'triangle', 1040); tone(1560, 0.12, 0.08, 'sine'); },
+    pew(){ tone(1400, 0.14, 0.2, 'square', 260); noise(4000, 2, 0.06, 0.08, 'highpass'); },
+    pop(){ tone(660, 0.09, 0.22, 'triangle', 1320); tone(990, 0.16, 0.14, 'sine', 1980); noise(2500, 1, 0.1, 0.18); },
+    tick(){ tone(1200, 0.05, 0.08, 'sine'); },
+    pick(){ tone(523, 0.1, 0.16, 'triangle'); setTimeout(() => tone(784, 0.18, 0.16, 'triangle'), 90); },
+    end(){ [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.16, 'triangle'), i * 120)); }
+  };
+})();
+
+// ---------------------------------------------------------------- the controller: phone orientation (or the mouse) to a pointing direction
+// The phone sends its orientation 60 times a second. The direction its top points becomes a heading and a pitch, measured from
+// where it pointed when you tapped Center. A small prediction (45 ms of the current turning speed) hides the network delay.
+const Ctrl = { phone: false, lastMsg: 0, dir: new V3(0, 0, -1), raw: new V3(0, 0, -1), prev: new V3(0, 0, -1), prevT: 0, omega: new V3(), speed: 0,
+  h0: null, p0: 0, rc: -1, fire: -1, fireCount: 0, held: false, mouse: { x: 0, y: 0, down: false, used: false }, mouseFire: 0 };
+const _q = new Q(), _b = new V3(), _ax = new V3(), _qq = new Q();
+function dirFromHP(h, p, out){ return out.set(Math.sin(h) * Math.cos(p), Math.sin(p), -Math.cos(h) * Math.cos(p)); }
+function wrap(a){ while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
+function onPhone(m){
+  if (!m || m.t !== 'm' || !m.q) return;
+  const now = performance.now() / 1000;
+  _q.set(m.q[0], m.q[1], m.q[2], m.q[3]); _b.set(0, 1, 0).applyQuaternion(_q);            // top of the phone, earth frame (x east, y north, z up)
+  const h = Math.atan2(_b.x, _b.y), p = Math.asin(clamp(_b.z, -1, 1));
+  if (m.rc !== Ctrl.rc || Ctrl.h0 === null){ Ctrl.rc = m.rc; Ctrl.h0 = h; Ctrl.p0 = p; toast('Centered'); }
+  const dh = wrap(h - Ctrl.h0), dp = clamp(p - Ctrl.p0, -1.5, 1.5);
+  Ctrl.prev.copy(Ctrl.raw); dirFromHP(dh, dp, Ctrl.raw);
+  const dt = Ctrl.prevT ? clamp(now - Ctrl.prevT, 0.004, 0.2) : 0.016; Ctrl.prevT = now;
+  _ax.crossVectors(Ctrl.prev, Ctrl.raw); const ang = Math.asin(clamp(_ax.length(), 0, 1));
+  if (ang > 1e-5) Ctrl.omega.copy(_ax.normalize()).multiplyScalar(ang / dt).lerp(Ctrl.omega, 0.35); else Ctrl.omega.multiplyScalar(0.5);
+  Ctrl.speed = Math.max(Ctrl.omega.length(), (m.rr || 0) * Math.PI / 180 * 0.85);
+  if (Ctrl.fire !== m.fire){ if (Ctrl.fire >= 0 && m.fire > Ctrl.fire) Ctrl.fireCount += m.fire - Ctrl.fire; Ctrl.fire = m.fire; }
+  Ctrl.held = !!m.held; Ctrl.phone = true; Ctrl.lastMsg = now;
+}
+function ctrlFrame(dt){
+  const now = performance.now() / 1000;
+  if (Ctrl.phone && now - Ctrl.lastMsg > 2.5){ Ctrl.phone = false; setPhoneState(false); }
+  if (Ctrl.phone){
+    // predict ahead along the current turn, then ease toward it
+    const lead = 0.045, w = Ctrl.omega.length();
+    const target = _b.copy(Ctrl.raw); if (w > 0.05){ _qq.setFromAxisAngle(_ax.copy(Ctrl.omega).normalize(), Math.min(w * lead, 0.35)); target.applyQuaternion(_qq); }
+    Ctrl.dir.lerp(target, 1 - Math.exp(-dt * 40)).normalize();
+  } else {
+    const prev = _b.copy(Ctrl.dir); dirFromHP(Ctrl.mouse.x * 1.05, Ctrl.mouse.y * 0.75, Ctrl.dir);
+    const ang = Math.acos(clamp(prev.dot(Ctrl.dir), -1, 1)); Ctrl.speed += (ang / Math.max(dt, 0.001) - Ctrl.speed) * 0.5; Ctrl.held = Ctrl.mouse.down;
+  }
+}
+addEventListener('pointermove', e => { Ctrl.mouse.x = e.clientX / innerWidth * 2 - 1; Ctrl.mouse.y = -(e.clientY / innerHeight * 2 - 1); Ctrl.mouse.used = true; });
+canvas.addEventListener('pointerdown', e => { Ctrl.mouse.down = true; if (!Ctrl.phone) Ctrl.fireCount++; Snd.init(); });
+addEventListener('pointerup', () => { Ctrl.mouse.down = false; });
+addEventListener('keydown', e => { Snd.init(); if (e.key === 'c' || e.key === 'C') { Ctrl.h0 = null; } if (e.key === 'Escape') toMenu(); });
+function takeFire(){ const n = Ctrl.fireCount; Ctrl.fireCount = 0; return n; }
+
+// ---------------------------------------------------------------- pairing
+let code = ClayLink.newCode(), link = null;
+function padUrl(){ const here = location.protocol === 'https:' ? new URL('pad.html', location.href).href : PAD_HOME; return here + '#' + code; }
+function showPair(){
+  $('codeBig').textContent = code; $('codeMini').textContent = code; $('padUrl').textContent = padUrl().replace(/^https?:\/\//, '').replace(/#.*/, '');
+  try { const qr = qrcode(0, 'M'); qr.addData(padUrl()); qr.make(); $('qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch (_) { $('qr').textContent = code; }
+}
+function setPhoneState(on){ $('phoneState').textContent = on ? 'Phone connected' : 'Waiting for a phone'; $('pair').classList.toggle('corner', on || Ctrl.mouse.used && mode !== 'pair'); }
+function startLink(){
+  if (link) link.close();
+  link = ClayLink.host(code, m => { const was = Ctrl.phone; onPhone(m); if (!was && Ctrl.phone){ setPhoneState(true); toast('Phone connected. Point it at the screen and tap Center.'); if (link) link.send({ t: 'hi', game: mode === 'saber' || mode === 'blaster' ? mode : 'menu' }); if (mode === 'pair') toMenu(); } },
+    s => { if (s === 'taken'){ code = ClayLink.newCode(); showPair(); startLink(); } if (s === 'offline') toast('No internet, so phones cannot join. The mouse still works.'); if (s === 'lost'){ setPhoneState(false); } });
+}
+showPair(); startLink();
+$('soundBtn').addEventListener('click', () => { Snd.init(); $('soundBtn').textContent = 'Sound is on'; });
+$('mouseBtn').addEventListener('click', () => { Snd.init(); Ctrl.mouse.used = true; toMenu(); });
+let toastT = 0; function toast(s){ $('toast').textContent = s; toastT = 3.2; }
+
+// ---------------------------------------------------------------- the pointer the menu and blaster share
+const reticle = new THREE.Group(); scene.add(reticle);
+(function(){ const m = new THREE.MeshBasicMaterial({ color: 0x5cf2cf, transparent: true, opacity: 0.95, depthTest: false });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.075, 0.095, 40), m); reticle.add(ring);
+  for (let i = 0; i < 4; i++){ const t = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.07), m); const a = i * Math.PI / 2; t.position.set(Math.cos(a) * 0.15, Math.sin(a) * 0.15, 0); t.rotation.z = a + Math.PI / 2; reticle.add(t); }
+  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.018, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })); reticle.add(dot); reticle.renderOrder = 10; reticle.traverse(o => o.renderOrder = 10); })();
+const ray = new THREE.Raycaster();
+const VIEW = { q: new Q() };      // the rail shooter turns the camera; aim is relative to where the camera looks
+function aimRay(){ ray.set(cam.position, _b.copy(Ctrl.dir).applyQuaternion(VIEW.q)); return ray; }
+function placeReticle(dist){ reticle.visible = true; reticle.position.copy(cam.position).addScaledVector(Ctrl.dir, dist); reticle.quaternion.copy(cam.quaternion); reticle.scale.setScalar(dist / 4); }
+
+// ---------------------------------------------------------------- menu: two holo panels, point and pull the trigger
+let mode = 'pair';
+const menu = new THREE.Group(); scene.add(menu);
+function holo(title, sub, color, x){
+  const c = document.createElement('canvas'); c.width = 768; c.height = 480; const g = c.getContext('2d');
+  const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding;
+  const draw = hi => { g.clearRect(0, 0, 768, 480); g.fillStyle = hi ? 'rgba(30,36,90,.92)' : 'rgba(14,18,48,.82)'; g.strokeStyle = color; g.lineWidth = hi ? 10 : 4;
+    g.beginPath(); g.roundRect ? g.roundRect(12, 12, 744, 456, 36) : g.rect(12, 12, 744, 456); g.fill(); g.stroke();
+    g.fillStyle = color; g.font = '700 120px "Space Grotesk", system-ui, sans-serif'; g.textAlign = 'center'; g.fillText(title, 384, 230);
+    g.fillStyle = '#c9cff5'; g.font = '500 38px Inter, system-ui, sans-serif'; g.fillText(sub, 384, 320);
+    g.font = '600 30px Inter, system-ui, sans-serif'; g.fillStyle = hi ? '#ffffff' : '#7f88c4'; g.fillText(hi ? 'Pull the trigger to play' : 'Point here', 384, 400); tex.needsUpdate = true; };
+  draw(false);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.5), new THREE.MeshBasicMaterial({ map: tex, transparent: true, fog: false })); m.position.set(x, 1.6, -4.2); m.rotation.y = -x * 0.12;
+  m.userData = { draw, hi: false }; menu.add(m); return m;
+}
+const pSaber = holo('Saber', 'Swing through the orbs', '#5cf2cf', -1.45), pBlast = holo('Blaster Run', 'Ride the station, pop the targets', '#ff4fa8', 1.45);
+function menuFrame(dt){
+  const hits = aimRay().intersectObjects([pSaber, pBlast]);
+  const over = hits.length ? hits[0].object : null;
+  for (const p of [pSaber, pBlast]){ const hi = p === over; if (hi !== p.userData.hi){ p.userData.hi = hi; p.userData.draw(hi); if (hi) Snd.tick(); } p.scale.setScalar(p.scale.x + ((hi ? 1.06 : 1) - p.scale.x) * 0.2); }
+  placeReticle(hits.length ? hits[0].distance - 0.05 : 4);
+  if (takeFire() && over){ Snd.init(); Snd.pick(); startGame(over === pSaber ? 'saber' : 'blaster'); }
+}
+function toMenu(){ stopGames(); mode = 'menu'; $('pair').classList.add('corner'); menu.visible = true; $('end').hidden = true; $('stats').hidden = true; $('gameName').innerHTML = 'Clay<b>house</b> Motion';
+  setPhoneState(Ctrl.phone); if (link) link.send({ t: 'hi', game: 'menu' }); takeFire(); }
+
+// ---------------------------------------------------------------- shared round state
+const R = { score: 0, combo: 0, best: 0, time: 60, hits: 0, shots: 0, on: false };
+function hudFrame(){ $('scoreV').textContent = R.score.toLocaleString(); $('comboV').textContent = R.combo;
+  if (mode === 'blaster'){ $('timeL').textContent = 'Area'; $('timeV').textContent = Blaster.area + ' / 4'; } else { $('timeL').textContent = 'Time'; $('timeV').textContent = Math.max(0, Math.ceil(R.time)); } }
+function award(base){ R.combo++; R.best = Math.max(R.best, R.combo); R.hits++; const mult = 1 + Math.min(4, Math.floor(R.combo / 8)); R.score += base * mult; if (link) link.send({ t: 'buzz', ms: 18 }); }
+function startGame(g){
+  stopGames(); mode = g; menu.visible = false; $('end').hidden = true; $('stats').hidden = false; $('pair').classList.add('corner');
+  Object.assign(R, { score: 0, combo: 0, best: 0, time: 60, hits: 0, shots: 0, on: true });
+  $('gameName').innerHTML = g === 'saber' ? 'Clay<b>house</b> Saber' : 'Clay<b>house</b> Blaster Run';
+  if (link) link.send({ t: 'hi', game: g });
+  if (g === 'saber') Saber.start(); else Blaster.start();
+  takeFire();
+}
+function stopGames(){ R.on = false; Saber.stop(); Blaster.stop(); reticle.visible = false; }
+function endRound(){
+  R.on = false; Snd.end(); Snd.humStop();
+  $('endTitle').textContent = mode === 'blaster' ? 'Run complete!' : 'Time!'; $('endScore').textContent = R.score.toLocaleString();
+  $('endNote').textContent = mode === 'saber' ? `${R.hits} orbs sliced, best combo ${R.best}` : `${R.hits} targets popped across four areas, best combo ${R.best}`;
+  $('end').hidden = false; takeFire();
+}
+$('againBtn').addEventListener('click', () => startGame(mode));
+$('menuBtn').addEventListener('click', toMenu);
+
+// ---------------------------------------------------------------- SABER: orbs fly in, swing the blade through them
+const Saber = (() => {
+  const G = new THREE.Group(); G.visible = false; scene.add(G);
+  const PIVOT = new V3(0.12, 0.98, -1.25);                      // hand height, a little right of center, an arm's length out
+  const LEN = 1.05;
+  const hilt = new THREE.Group(); G.add(hilt);
+  const metal = new THREE.MeshStandardMaterial({ color: 0xb9c0d8, metalness: 0.9, roughness: 0.25 });
+  const grip = new THREE.MeshStandardMaterial({ color: 0x1b1f33, metalness: 0.3, roughness: 0.6 });
+  const h1 = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.2, 18), grip); h1.position.y = -0.06; hilt.add(h1);
+  const h2 = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.022, 0.07, 18), metal); h2.position.y = 0.065; hilt.add(h2);
+  const h3 = new THREE.Mesh(new THREE.TorusGeometry(0.026, 0.006, 8, 20), metal); h3.rotation.x = Math.PI / 2; h3.position.y = -0.16; hilt.add(h3);
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.014, LEN, 12), new THREE.MeshBasicMaterial({ color: 0xffffff })); core.position.y = 0.1 + LEN / 2; hilt.add(core);
+  const glowM = new THREE.MeshBasicMaterial({ color: 0x5cf2cf, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, LEN + 0.04, 16, 1, true), glowM); glow.position.y = 0.1 + LEN / 2; hilt.add(glow);
+  const glow2 = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.075, LEN + 0.08, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0x5cf2cf, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false })); glow2.position.y = 0.1 + LEN / 2; hilt.add(glow2);
+  const bladeLight = new THREE.PointLight(0x5cf2cf, 1.2, 3); bladeLight.position.y = 0.6; hilt.add(bladeLight);
+  // a fading ribbon of the blade's last positions: the swing trail
+  const NT = 14, trailPos = new Float32Array(NT * 2 * 3), trailA = new Float32Array(NT * 2);
+  const tGeo = new THREE.BufferGeometry(); tGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3)); tGeo.setAttribute('alpha', new THREE.BufferAttribute(trailA, 1));
+  const idx = []; for (let i = 0; i < NT - 1; i++){ const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } tGeo.setIndex(idx);
+  const tMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { col: { value: new THREE.Color(0x5cf2cf) } },
+    vertexShader: 'attribute float alpha; varying float va; void main(){ va = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: 'uniform vec3 col; varying float va; void main(){ gl_FragColor = vec4(col * va, va); }' });
+  const trail = new THREE.Mesh(tGeo, tMat); trail.frustumCulled = false; G.add(trail);
+  const hist = []; for (let i = 0; i < NT; i++) hist.push({ a: new V3(), b: new V3() });
+
+  const orbs = [], halves = [];
+  const ORB_R = 0.12, COLORS = [0x5cf2cf, 0xff4fa8];
+  const orbGeo = new THREE.SphereGeometry(ORB_R, 28, 20);
+  const halfGeo = new THREE.SphereGeometry(ORB_R, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+  const capGeo = new THREE.CircleGeometry(ORB_R, 24);
+  const orbMats = COLORS.map(c => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.55, roughness: 0.25, metalness: 0.1 }));
+  const capMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+  const haloMats = COLORS.map(c => new THREE.SpriteMaterial({ map: glowTex, color: c, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
+  let spawnT = 0, t = 0, lastWhoosh = 0;
+  const tip = new V3(), base = new V3(), segA = new V3(), segB = new V3(), cp = new V3(), tmp = new V3();
+  function spawn(){
+    const ci = Math.random() < 0.5 ? 0 : 1, m = new THREE.Mesh(orbGeo, orbMats[ci]);
+    const halo = new THREE.Sprite(haloMats[ci]); halo.scale.setScalar(0.55); m.add(halo);
+    // aim each orb at a point the blade can reach, then start it far down the room
+    const ang = (Math.random() * 1.6 - 0.8), up = Math.random() * 0.9 - 0.15, r = 0.55 + Math.random() * 0.35;
+    const goal = new V3(PIVOT.x + Math.sin(ang) * r, PIVOT.y + 0.25 + up * 0.6, PIVOT.z - 0.35);
+    const start = new V3(goal.x * 1.6 + (Math.random() - 0.5) * 1.2, goal.y + (Math.random() - 0.3) * 1.2, -16);
+    const speed = 4.2 + Math.min(3, t / 20);
+    m.position.copy(start); m.userData = { ci, vel: goal.clone().sub(start).normalize().multiplyScalar(speed), spin: new V3(Math.random(), Math.random(), Math.random()).multiplyScalar(2), live: true };
+    G.add(m); orbs.push(m);
+  }
+  function slice(o, normal){
+    const p = o.position.clone(), col = COLORS[o.userData.ci];
+    for (const s of [-1, 1]){
+      const h = new THREE.Group(); const sh = new THREE.Mesh(halfGeo, orbMats[o.userData.ci]); h.add(sh); const cap = new THREE.Mesh(capGeo, capMat); cap.rotation.x = Math.PI / 2; h.add(cap);
+      h.position.copy(p); h.quaternion.setFromUnitVectors(new V3(0, 1, 0), normal.clone().multiplyScalar(s));
+      h.userData = { vel: o.userData.vel.clone().multiplyScalar(0.25).addScaledVector(normal, s * 2.2).add(new V3(0, 0.8, 0)), spin: new V3(Math.random() * 6 - 3, Math.random() * 6 - 3, Math.random() * 6 - 3), life: 1.1 };
+      G.add(h); halves.push(h);
+    }
+    burst(p, col, 34, 3.2); Snd.slice(); award(100);
+    G.remove(o); o.userData.live = false;
+  }
+  return {
+    start(){ G.visible = true; t = 0; spawnT = 0.6; hist.forEach(h => { h.a.set(0, -9, 0); h.b.set(0, -9, 0); }); Snd.humStart(); },
+    stop(){ G.visible = false; orbs.splice(0).forEach(o => G.remove(o)); halves.splice(0).forEach(h => G.remove(h)); Snd.humStop(); },
+    frame(dt){
+      t += dt;
+      // the blade: from the hand, along the phone's pointing direction
+      hilt.position.copy(PIVOT); hilt.quaternion.setFromUnitVectors(new V3(0, 1, 0), Ctrl.dir);
+      base.copy(PIVOT).addScaledVector(Ctrl.dir, 0.1); tip.copy(PIVOT).addScaledVector(Ctrl.dir, 0.1 + LEN);
+      const sp = Ctrl.speed; Snd.humSet(sp); glowM.opacity = 0.32 + Math.min(0.3, sp * 0.03);
+      if (sp > 5 && t - lastWhoosh > 0.25){ lastWhoosh = t; Snd.whoosh(Math.min(1, sp / 12)); }
+      // trail
+      hist.pop(); hist.unshift({ a: base.clone(), b: tip.clone() });
+      for (let i = 0; i < NT; i++){ const h = hist[i]; trailPos.set([h.a.x, h.a.y, h.a.z], i * 6); trailPos.set([h.b.x, h.b.y, h.b.z], i * 6 + 3); const a = (1 - i / NT) * Math.min(1, sp / 8) * 0.3; trailA[i * 2] = a * 0.3; trailA[i * 2 + 1] = a; }
+      tGeo.attributes.position.needsUpdate = true; tGeo.attributes.alpha.needsUpdate = true;
+      if (!R.on) return;
+      R.time -= dt; if (R.time <= 0){ R.time = 0; endRound(); }
+      spawnT -= dt; if (spawnT <= 0){ spawn(); if (Math.random() < Math.min(0.45, t / 90)) spawn(); spawnT = Math.max(0.42, 1.0 - t / 70); }
+      for (let i = orbs.length - 1; i >= 0; i--){
+        const o = orbs[i], u = o.userData; if (!u.live){ orbs.splice(i, 1); continue; }
+        o.position.addScaledVector(u.vel, dt); o.rotation.x += u.spin.x * dt; o.rotation.y += u.spin.y * dt;
+        // swept test: the blade from its last pose to this one, against the orb
+        segA.copy(base); segB.copy(tip);
+        const prev = hist[1];
+        let d = new THREE.Line3(segA, segB).closestPointToPoint(o.position, true, cp).distanceTo(o.position);
+        if (prev && prev.a.y > -5){ const mid = tmp.copy(prev.b).lerp(tip, 0.5); d = Math.min(d, new THREE.Line3(segA, mid).closestPointToPoint(o.position, true, cp).distanceTo(o.position)); }
+        if (d < ORB_R + 0.05 && sp > 2.0){
+          const n = tmp.crossVectors(Ctrl.dir, Ctrl.omega.lengthSq() > 1e-4 ? Ctrl.omega : new V3(0, 0, 1)).normalize(); if (!isFinite(n.x)) n.set(1, 0, 0);
+          slice(o, n.clone()); orbs.splice(i, 1); continue;
+        }
+        if (o.position.z > PIVOT.z + 0.9){ G.remove(o); orbs.splice(i, 1); R.combo = 0; }           // a miss just ends the combo, no penalty
+      }
+      for (let i = halves.length - 1; i >= 0; i--){ const h = halves[i], u = h.userData; u.life -= dt; u.vel.y -= 6 * dt; h.position.addScaledVector(u.vel, dt);
+        h.rotation.x += u.spin.x * dt; h.rotation.y += u.spin.y * dt; h.scale.setScalar(Math.max(0.01, Math.min(1, u.life * 2))); if (u.life <= 0){ G.remove(h); halves.splice(i, 1); } }
+    }
+  };
+})();
+
+// ---------------------------------------------------------------- BLASTER RUN: an on-rails arcade shooter through the station
+// The camera rides a track from area to area. At each stop a wave of targets pops out from doorways, hatches and the ceiling;
+// clear them (or wait them out) and the ride moves on to the next area. Four areas, then the score.
+const Blaster = (() => {
+  const G = new THREE.Group(); G.visible = false; scene.add(G);
+  const CELL = 2.6, HGT = 4.4;
+  // the station as a tile map: letters are walkable cells, the letter is the area (each area has its own light colour)
+  const MAP = [
+    '............',
+    '.....DDDDDD.',
+    '.....DDDDDD.',
+    '.....DDDDDD.',
+    '......CC....',
+    '......CC....',
+    '.CCCCCCC....',
+    '.CCCCCCC....',
+    '.BB.........',
+    'BBBBB.......',
+    'BBBBB.......',
+    'BBBBB.......',
+    '.AA.........',
+    '.AA.........',
+    '.AA.........'];
+  const ROWS = MAP.length, COLS = MAP[0].length;
+  const cellAt = (c, r) => (r >= 0 && r < ROWS && c >= 0 && c < COLS) ? MAP[r][c] : '.';
+  const W = (c, r) => new V3((c - 2) * CELL, 0, (r - (ROWS - 1)) * CELL);      // the start cell (col 2, last row) is the origin
+  const AREA = { A: { glow: 0x5cf2cf, wall: 0x141a44 }, B: { glow: 0xffb84d, wall: 0x1c1838 }, C: { glow: 0xff4fa8, wall: 0x181540 }, D: { glow: 0x8fd3ff, wall: 0x101a40 } };
+  const level = new THREE.Group(); G.add(level);
+  (function build(){
+    const floorM = new THREE.MeshStandardMaterial({ color: 0x0d1130, roughness: 0.35, metalness: 0.45 });
+    const ceilM = new THREE.MeshStandardMaterial({ color: 0x0a0d26, roughness: 0.8 });
+    const rib = new THREE.MeshStandardMaterial({ color: 0x232c6e, roughness: 0.4, metalness: 0.5 });
+    const seam = new THREE.MeshBasicMaterial({ color: 0x2b3a8a });
+    const wallMs = {}, glowMs = {};
+    for (const k in AREA){ wallMs[k] = new THREE.MeshStandardMaterial({ color: AREA[k].wall, roughness: 0.55, metalness: 0.3 }); glowMs[k] = new THREE.MeshBasicMaterial({ color: AREA[k].glow }); }
+    const winTex = (() => { const c = document.createElement('canvas'); c.width = 2048; c.height = 512; const g = c.getContext('2d'); g.fillStyle = '#02030b'; g.fillRect(0, 0, 2048, 512);
+      for (let i = 0; i < 900; i++){ g.fillStyle = `rgba(255,255,255,${Math.random()})`; g.fillRect(Math.random() * 2048, Math.random() * 512, 1.5, 1.5); }
+      const pl = g.createRadialGradient(1250, 760, 120, 1250, 760, 560); pl.addColorStop(0, '#5fd3ff'); pl.addColorStop(0.6, '#1d63b8'); pl.addColorStop(1, 'rgba(10,42,107,0)'); g.fillStyle = pl; g.beginPath(); g.arc(1250, 760, 560, 0, Math.PI * 2); g.fill();
+      const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; })();
+    const winM = new THREE.MeshBasicMaterial({ map: winTex, fog: false });
+    const panel = new THREE.PlaneGeometry(CELL, HGT), flat = new THREE.PlaneGeometry(CELL, CELL);
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++){
+      const a = cellAt(c, r); if (a === '.') continue; const o = W(c, r);
+      const f = new THREE.Mesh(flat, floorM); f.rotation.x = -Math.PI / 2; f.position.copy(o); level.add(f);
+      const s1 = new THREE.Mesh(new THREE.PlaneGeometry(CELL, 0.03), seam); s1.rotation.x = -Math.PI / 2; s1.position.set(o.x, 0.003, o.z + CELL / 2); level.add(s1);
+      const ce = new THREE.Mesh(flat, ceilM); ce.rotation.x = Math.PI / 2; ce.position.set(o.x, HGT, o.z); level.add(ce);
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.04, 0.14), glowMs[a]); lamp.position.set(o.x, HGT - 0.05, o.z); level.add(lamp);
+      // walls on every edge that faces nothing
+      [[0, -1, 0], [0, 1, Math.PI], [-1, 0, Math.PI / 2], [1, 0, -Math.PI / 2]].forEach(([dc, dr, rot], k) => {
+        if (cellAt(c + dc, r + dr) !== '.') return;
+        const isWindow = a === 'D' && dr === -1;
+        let wm = wallMs[a];
+        if (isWindow){ const tx = winTex.clone(); tx.needsUpdate = true; tx.repeat.set(1 / 6, 1); tx.offset.set((c - 5) / 6, 0); wm = new THREE.MeshBasicMaterial({ map: tx, fog: false }); }   // one view of space across all six window panes
+        const w = new THREE.Mesh(panel, wm); w.position.set(o.x + dc * CELL / 2, HGT / 2, o.z + dr * CELL / 2); w.rotation.y = rot; level.add(w);
+        if (isWindow) return;
+        const st = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.4, 0.05), glowMs[a]); st.position.copy(w.position).setY(1.9); st.rotation.y = rot;
+        st.position.x -= dc * 0.04; st.position.z -= dr * 0.04; level.add(st);
+        const rb = new THREE.Mesh(new THREE.BoxGeometry(0.28, HGT, 0.28), rib); rb.position.set(w.position.x + (dr ? CELL / 2 : 0), HGT / 2, w.position.z + (dc ? CELL / 2 : 0)); level.add(rb);
+      });
+    }
+    // cover props: crates and consoles that targets duck behind
+    const crateM = new THREE.MeshStandardMaterial({ color: 0x3a4290, roughness: 0.5, metalness: 0.3 }), crateT = new THREE.MeshBasicMaterial({ color: 0xffb84d });
+    [[0.4, 10.6, 1.1], [3.7, 9.4, 1.0], [2.9, 10.9, 0.8], [5.3, 7.4, 0.9], [7.4, 6.2, 0.8], [5.8, 2.0, 1.1], [9.2, 1.7, 1.0], [8.0, 2.9, 0.8]].forEach(([c, r, s]) => {
+      const p = W(c, r), m = new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.8, s), crateM); m.position.set(p.x, s * 0.4, p.z); level.add(m);
+      const t = new THREE.Mesh(new THREE.BoxGeometry(s * 1.01, 0.05, s * 1.01), crateT); t.position.set(p.x, s * 0.55, p.z); level.add(t); });
+  })();
+
+  // the ride: waypoints through the areas; at a stop the camera turns to face the wave
+  const TRACK = [
+    { p: W(1.5, 14.2) },
+    { p: W(1.5, 12.6), stop: 0, look: W(2.2, 10) },
+    { p: W(1.5, 9.6) },
+    { p: W(1.6, 7.6) },
+    { p: W(2.2, 6.6), stop: 1, look: W(6, 6.5) },
+    { p: W(5.2, 6.5) },
+    { p: W(6.5, 6.4), stop: 2, look: W(6.6, 3.2) },
+    { p: W(6.5, 4.3) },
+    { p: W(6.6, 3.4), stop: 3, look: W(8, 1.3) }];
+  // each wave: where things appear (cells) and how many
+  const WAVES = [
+    { spots: [[0.4, 9.9], [2, 9.4], [3.5, 10.1], [4.1, 9.3], [1, 10.9], [3.1, 11], [2.2, 10.4]], n: 7, label: 'Docking bay' },
+    { spots: [[4, 6.2], [5, 7.1], [6.1, 6.3], [7, 6.9], [3.6, 7], [4.6, 6.6]], n: 8, label: 'Cargo walk' },
+    { spots: [[6, 4.6], [7.1, 4.3], [6.3, 3.1], [7.2, 2.6], [6.8, 4.9]], n: 8, label: 'Lift shaft' },
+    { spots: [[5.5, 1.5], [7, 1.2], [8.5, 1.4], [9.8, 2], [9, 2.8], [6.1, 2.6], [10, 1.2]], n: 11, label: 'Observation deck' }];
+
+  // the toy blaster, held low right; it rides with the camera
+  const gun = new THREE.Group(); G.add(gun);
+  const body = new THREE.MeshStandardMaterial({ color: 0xff7a2e, emissive: 0xff5a10, emissiveIntensity: 0.45, roughness: 0.35, metalness: 0.1 }), trim = new THREE.MeshStandardMaterial({ color: 0x2a2f55, emissive: 0x141833, roughness: 0.5 }), glowC = new THREE.MeshBasicMaterial({ color: 0x5cf2cf });
+  gun.scale.setScalar(0.8);
+  const gb = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.1, 0.32), body); gun.add(gb);
+  const g2 = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.034, 0.22, 16), trim); g2.rotation.x = Math.PI / 2; g2.position.set(0, 0.015, -0.24); gun.add(g2);
+  const g3 = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.009, 8, 20), glowC); g3.position.set(0, 0.015, -0.35); gun.add(g3);
+  const g4 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.07), trim); g4.position.set(0, -0.1, 0.07); g4.rotation.x = 0.35; gun.add(g4);
+  const g5 = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.02, 0.24), glowC); g5.position.set(0, 0.06, -0.02); gun.add(g5);
+  const MUZ = new V3(0, 0.015, -0.37), GUNOFF = new V3(0.34, -0.36, -1.05);
+  const boltMat = new THREE.MeshBasicMaterial({ color: 0xff4fa8, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+  const bolts = [];
+  // targets: bullseye boards that slide out, and hover pods that drop from the ceiling
+  const tex = (() => { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'); const cols = ['#ff4fa8', '#ffffff', '#5cf2cf', '#ffffff', '#ffb84d'];
+    for (let i = 0; i < 5; i++){ g.fillStyle = cols[i]; g.beginPath(); g.arc(128, 128, 124 - i * 24, 0, Math.PI * 2); g.fill(); } const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; })();
+  const boardMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.4, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.35 });
+  const rimMat = new THREE.MeshStandardMaterial({ color: 0x2a3166, metalness: 0.6, roughness: 0.3 });
+  const podMats = [0x5cf2cf, 0xffb84d, 0xb68cff].map(c => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.5, roughness: 0.3 }));
+  const targets = [];
+  let seg = 0, segT = 0, state = 'ride', wave = null, cool = 0, t = 0, banner = 0;
+  const camPos = new V3(), lookAt = new V3(), lookGoal = new V3(), tmp = new V3();
+  function spawn(spot){
+    const p = W(spot[0], spot[1]), board = Math.random() < 0.55, g = new THREE.Group();
+    if (board){ const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.06, 40), [rimMat, boardMat, rimMat]); disc.rotation.x = Math.PI / 2; g.add(disc);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.2, 8), rimMat); post.position.y = -0.75; g.add(post);
+      g.position.set(p.x, -0.9, p.z); g.userData = { kind: 'board', hit: disc, y: 1.0 + Math.random() * 0.9, rise: 0, pts: 150, life: 6 + Math.random() * 3, sway: (Math.random() - 0.5) * 1.2, x0: p.x }; }
+    else { const m = new THREE.Mesh(new THREE.SphereGeometry(0.22, 28, 18), podMats[(Math.random() * 3) | 0]); g.add(m);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.025, 8, 32), rimMat); ring.rotation.x = Math.PI / 2; g.add(ring);
+      const eye = new THREE.Mesh(new THREE.CircleGeometry(0.075, 20), new THREE.MeshBasicMaterial({ color: 0xffffff })); eye.position.z = 0.215; g.add(eye);
+      g.position.set(p.x, HGT + 0.3, p.z); g.userData = { kind: 'pod', hit: m, y: 1.3 + Math.random() * 1.6, rise: 0, ph: Math.random() * 6, pts: 200, life: 7 + Math.random() * 3, x0: p.x }; }
+    G.add(g); targets.push(g);
+  }
+  function aimDirWorld(out){ return out.copy(Ctrl.dir).applyQuaternion(VIEW.q); }
+  function shoot(){
+    R.shots++; Snd.pew(); cool = 0.16;
+    const from = gun.localToWorld(MUZ.clone()), dir = aimDirWorld(new V3());
+    ray.set(cam.position, dir);
+    const hits = ray.intersectObjects(targets.map(g => g.userData.hit), false);
+    const wall = ray.intersectObject(level, true);
+    const to = hits.length ? hits[0].point : wall.length ? wall[0].point : cam.position.clone().addScaledVector(dir, 20);
+    const len = from.distanceTo(to), bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, len, 6, 1, true), boltMat);
+    bolt.position.copy(from).lerp(to, 0.5); bolt.quaternion.setFromUnitVectors(new V3(0, 1, 0), to.clone().sub(from).normalize()); bolt.userData = { life: 0.09 }; G.add(bolt); bolts.push(bolt);
+    if (hits.length && (!wall.length || hits[0].distance <= wall[0].distance + 0.05)){
+      const g = targets.find(x => x.userData.hit === hits[0].object); if (!g) return;
+      let pts = g.userData.pts;
+      if (g.userData.kind === 'board'){ const local = g.worldToLocal(hits[0].point.clone()); const r = Math.hypot(local.x, local.y); if (r < 0.08) pts += 200; else if (r < 0.17) pts += 80; }
+      burst(hits[0].point, g.userData.kind === 'board' ? 0xff4fa8 : 0x5cf2cf, 40, 3.5); Snd.pop(); award(pts);
+      G.remove(g); targets.splice(targets.indexOf(g), 1); if (wave) wave.cleared++;
+    } else { R.combo = 0; if (wall.length) burst(wall[0].point, 0xffffff, 6, 1.2); }
+  }
+  function startWave(i){ const w = WAVES[i]; wave = { i, left: w.n, cleared: 0, t: 0, next: 0.4, w }; state = 'wave'; banner = 2; toast(w.label); }
+  return {
+    get targets(){ return targets; }, get area(){ return Math.min(4, (wave ? wave.i : TRACK.slice(0, seg + 1).filter(x => x.stop !== undefined).length) + (wave ? 1 : 0)) || 1; },
+    start(){ G.visible = true; room.visible = false; t = 0; seg = 0; segT = 0; state = 'ride'; wave = null; cool = 0;
+      camPos.copy(TRACK[0].p).setY(1.6); lookAt.copy(TRACK[1].p).setY(1.5); },
+    stop(){ G.visible = false; room.visible = true; targets.splice(0).forEach(g => G.remove(g)); bolts.splice(0).forEach(b => G.remove(b)); VIEW.q.identity(); },
+    frame(dt){
+      t += dt; cool -= dt;
+      // ride along the track; hold at stops until the wave is done
+      if (R.on && state === 'ride'){
+        const a = TRACK[seg], b = TRACK[seg + 1];
+        if (!b){ endRound(); return; }
+        const len = a.p.distanceTo(b.p), spd = 3.2; segT = Math.min(1, segT + dt * spd / Math.max(len, 0.01));
+        tmp.copy(a.p).lerp(b.p, ease(segT)); camPos.set(tmp.x, 1.6, tmp.z);
+        const nb = TRACK[seg + 2]; lookGoal.copy(b.look || (nb ? nb.p : b.p)).setY(1.5); if (lookGoal.distanceToSquared(camPos) < 0.5) lookGoal.copy(camPos).add(new V3(0, -0.1, -2));
+        if (segT >= 1){ seg++; segT = 0; if (b.stop !== undefined) startWave(b.stop); }
+      } else if (state === 'wave' && b4(TRACK[seg])) lookGoal.copy(TRACK[seg].look).setY(1.45);
+      lookAt.lerp(lookGoal, 1 - Math.exp(-dt * 2.6));
+      cam.position.copy(camPos).add(tmp.set(Math.sin(t * 0.9) * 0.015, Math.sin(t * 1.7) * 0.01, 0)); cam.lookAt(lookAt);
+      VIEW.q.copy(cam.quaternion);
+      // the blaster follows the camera and points where you aim
+      gun.position.copy(GUNOFF).applyQuaternion(cam.quaternion).add(cam.position);
+      gun.quaternion.setFromUnitVectors(new V3(0, 0, -1), aimDirWorld(tmp)); gun.position.addScaledVector(aimDirWorld(tmp), Math.min(0, -cool * 0.25));
+      ray.set(cam.position, aimDirWorld(tmp)); const ah = ray.intersectObjects(targets.map(g => g.userData.hit), false), aw = ray.intersectObject(level, true);
+      const d = Math.min(ah.length ? ah[0].distance : 99, aw.length ? aw[0].distance : 99, 12) - 0.05;
+      reticle.visible = true; reticle.position.copy(cam.position).addScaledVector(tmp, d); reticle.quaternion.copy(cam.quaternion); reticle.scale.setScalar(clamp(d / 4, 0.3, 2));
+      for (let i = bolts.length - 1; i >= 0; i--){ const b = bolts[i]; b.userData.life -= dt; b.material.opacity = Math.max(0, b.userData.life / 0.09); if (b.userData.life <= 0){ G.remove(b); bolts.splice(i, 1); } }
+      if (!R.on){ takeFire(); return; }
+      const shots = takeFire(); if (shots) shoot(); else if (Ctrl.held && cool <= 0 && Ctrl.phone) shoot();
+      if (state === 'wave'){
+        wave.t += dt; wave.next -= dt;
+        if (wave.left > 0 && wave.next <= 0 && targets.length < 5){ const sp = wave.w.spots[(Math.random() * wave.w.spots.length) | 0]; spawn(sp); wave.left--; wave.next = 0.55 + Math.random() * 0.6; }
+        if (wave.left <= 0 && !targets.length || wave.t > 22){ targets.splice(0).forEach(g => G.remove(g)); state = 'ride'; if (wave.cleared >= wave.w.n){ R.score += 500; toast('Area cleared! +500'); Snd.end(); } wave = null; }
+      }
+      R.time = Math.max(0, 60 - t);
+      for (let i = targets.length - 1; i >= 0; i--){
+        const g = targets[i], u = g.userData; u.life -= dt; u.rise = Math.min(1, u.rise + dt * 2.2);
+        if (u.kind === 'board'){ g.position.y = -0.9 + (u.y + 0.9) * ease(u.rise); g.position.x = u.x0 + Math.sin(t * 1.3 + u.x0) * u.sway; g.lookAt(cam.position.x, g.position.y, cam.position.z); }
+        else { u.ph += dt; g.position.y = HGT + 0.3 + (u.y - HGT - 0.3) * ease(u.rise) + Math.sin(u.ph * 2) * 0.06; g.position.x = u.x0 + Math.sin(u.ph * 0.9) * 0.6; g.lookAt(cam.position); }
+        if (u.life <= 0){ G.remove(g); targets.splice(i, 1); }       // it slips away: no penalty, the wave just moves on
+      }
+    }
+  };
+  function b4(tr){ return tr && tr.look; }
+})();
+
+// ---------------------------------------------------------------- main loop
+let lastT = performance.now();
+menu.visible = false; reticle.visible = false;
+function loop(){
+  requestAnimationFrame(loop);
+  const now = performance.now(), dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+  ctrlFrame(dt);
+  if (mode === 'menu') menuFrame(dt);
+  else if (mode === 'saber'){ reticle.visible = false; Saber.frame(dt); hudFrame(); }
+  else if (mode === 'blaster'){ Blaster.frame(dt); hudFrame(); }
+  else { reticle.visible = false; }
+  sparkFrame(dt);
+  if (mode !== 'blaster'){ const sway = Math.sin(now / 2400) * 0.02; cam.position.set(EYE.x + sway, EYE.y + Math.sin(now / 1700) * 0.008, EYE.z); cam.lookAt(sway * 0.5, 1.45, -5); }
+  if (toastT > 0){ toastT -= dt; if (toastT <= 0) $('toast').textContent = ''; }
+  renderer.render(scene, cam);
+}
+loop();
+window.__motion = { Ctrl, R, onPhone, VIEW, Blaster, cam, startGame, toMenu, tick(n, dt){ for (let i = 0; i < n; i++){ scene.updateMatrixWorld(); ctrlFrame(dt); if (mode === 'saber') Saber.frame(dt); else if (mode === 'blaster') Blaster.frame(dt); else if (mode === 'menu') menuFrame(dt); sparkFrame(dt); } }, get mode(){ return mode; }, code: () => code };
+})();
+</script>
+</body></html>

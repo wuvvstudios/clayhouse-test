@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0b0f24">
+<title>Clayhouse Controller</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* one-screen controller: status on top, the big trigger fills the rest */
+:root{ --bg:#0b0f24; --panel:#151a38; --line:#2a3166; --fg:#eef1ff; --dim:#9aa3d6; --mint:#5cf2cf; --pink:#ff4fa8; --amber:#ffb84d;
+  --disp:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif; color-scheme:dark }
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent }
+html,body{ height:100%; margin:0; background:var(--bg); color:var(--fg); font-family:var(--body); overscroll-behavior:none; touch-action:manipulation }
+body{ display:flex; flex-direction:column; gap:14px; padding:max(14px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); user-select:none; -webkit-user-select:none }
+header{ display:flex; align-items:center; justify-content:space-between; gap:10px }
+.brand{ font-family:var(--disp); font-weight:700; font-size:20px; letter-spacing:.01em }
+.brand b{ color:var(--mint); font-weight:700 }
+.pill{ font-size:12px; letter-spacing:.06em; text-transform:uppercase; padding:6px 10px; border-radius:99px; border:1px solid var(--line); color:var(--dim); white-space:nowrap }
+.pill.ok{ color:var(--bg); background:var(--mint); border-color:var(--mint) }
+.pill.warn{ color:var(--bg); background:var(--amber); border-color:var(--amber) }
+#join{ display:flex; flex-direction:column; gap:14px; margin-top:6vh }
+#join h1{ font-family:var(--disp); font-size:30px; line-height:1.1; margin:0; text-wrap:balance }
+#join p{ margin:0; color:var(--dim); line-height:1.5 }
+.code{ display:flex; gap:10px }
+#code{ flex:1; min-width:0; font-family:var(--disp); font-size:34px; letter-spacing:.35em; text-transform:uppercase; text-align:center; padding:12px 8px; border-radius:14px; border:2px solid var(--line); background:var(--panel); color:var(--fg) }
+#code:focus{ outline:none; border-color:var(--mint) }
+button{ font:600 17px var(--body); border:0; border-radius:14px; padding:16px 18px; color:var(--bg); background:var(--mint); cursor:pointer }
+button.ghost{ background:transparent; color:var(--fg); border:2px solid var(--line) }
+button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
+#play{ flex:1; display:flex; flex-direction:column; gap:12px; min-height:0 }
+.mode{ display:flex; align-items:baseline; justify-content:space-between; gap:10px }
+.mode h2{ font-family:var(--disp); font-size:26px; margin:0 }
+.mode span{ color:var(--dim); font-size:13px }
+.tip{ color:var(--dim); font-size:14px; line-height:1.45; margin:0 }
+#trigger{ flex:1; min-height:180px; border-radius:22px; border:2px solid var(--line); background:radial-gradient(circle at 50% 45%, #231a4f 0%, var(--panel) 70%);
+  display:flex; align-items:center; justify-content:center; flex-direction:column; gap:6px; font-family:var(--disp); font-size:28px; color:var(--fg); touch-action:none; transition:transform .05s }
+#trigger small{ font-family:var(--body); font-size:13px; color:var(--dim) }
+#trigger.down{ transform:scale(.985); border-color:var(--pink); background:radial-gradient(circle at 50% 45%, #5a1b52 0%, var(--panel) 70%) }
+.row{ display:flex; gap:10px } .row button{ flex:1 }
+.err{ color:var(--amber); font-size:14px; margin:0 }
+</style>
+</head><body>
+<header><div class="brand">Clay<b>house</b></div><div id="pill" class="pill">Not connected</div></header>
+
+<section id="join">
+  <h1>Turn this phone into the controller</h1>
+  <p>Type the four letters showing on the TV or laptop, then tap Connect. Your phone will ask to use motion. Allow it.</p>
+  <div class="code"><input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" aria-label="Room code"></div>
+  <button id="go">Connect</button>
+  <p id="err" class="err" hidden></p>
+</section>
+
+<section id="play" hidden>
+  <div class="mode"><h2 id="modeName">Saber</h2><span id="rate"></span></div>
+  <p id="modeTip" class="tip">Hold the phone like a sword handle, top of the phone pointing up. Swing through the glowing orbs.</p>
+  <div id="trigger" role="button" aria-label="Trigger">Trigger<small>tap to fire, hold to keep firing</small></div>
+  <div class="row"><button id="center" class="ghost">Center</button><button id="leave" class="ghost">Leave</button></div>
+  <p class="tip">Point the top of the phone at the screen and tap Center whenever your aim drifts.</p>
+</section>
+
+<script src="lib/peerjs.min.js"></script>
+<script src="link.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const pill = $('pill'), codeIn = $('code');
+  let link = null, q = [0,0,0,1], rr = 0, fire = 0, rc = 0, held = false, gotOri = false, sent = 0, wake = null;
+  const TIPS = {
+    saber: ['Saber', 'Hold the phone like a sword handle, top of the phone pointing up. Swing through the glowing orbs.'],
+    blaster: ['Blaster', 'Hold the phone like a blaster, top of the phone pointing at the screen. Aim at the targets and tap the trigger.'],
+    menu: ['Pick a game', 'Point the top of the phone at a game on the screen and tap the trigger to choose it.']
+  };
+  try { const h = ClayLink.cleanCode(location.hash.slice(1)); if (h) codeIn.value = h; } catch (_) {}
+  function status(text, cls){ pill.textContent = text; pill.className = 'pill' + (cls ? ' ' + cls : ''); }
+  function err(msg){ const e = $('err'); e.textContent = msg; e.hidden = !msg; }
+
+  // device orientation (W3C ZXY Euler) to a quaternion in the earth frame (x east, y north, z up)
+  const D2R = Math.PI / 180;
+  function onOri(e){
+    if (e.alpha == null) return;
+    const x = (e.beta || 0) * D2R, y = (e.gamma || 0) * D2R, z = e.alpha * D2R;
+    const cX = Math.cos(x/2), cY = Math.cos(y/2), cZ = Math.cos(z/2), sX = Math.sin(x/2), sY = Math.sin(y/2), sZ = Math.sin(z/2);
+    q = [ sX*cY*cZ - cX*sY*sZ, cX*sY*cZ + sX*cY*sZ, cX*cY*sZ + sX*sY*cZ, cX*cY*cZ - sX*sY*sZ ];
+    gotOri = true;
+  }
+  function onMot(e){ const r = e.rotationRate; if (r && r.alpha != null) rr = Math.hypot(r.alpha || 0, r.beta || 0, r.gamma || 0); }
+
+  async function askMotion(){
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'){
+        const a = await DeviceOrientationEvent.requestPermission();
+        if (a !== 'granted') return false;
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') { try { await DeviceMotionEvent.requestPermission(); } catch (_) {} }
+      }
+    } catch (_) { return false; }
+    addEventListener('deviceorientation', onOri, true);
+    addEventListener('devicemotion', onMot, true);
+    return true;
+  }
+  async function keepAwake(){ try { if ('wakeLock' in navigator) wake = await navigator.wakeLock.request('screen'); } catch (_) {} }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && link) keepAwake(); });
+
+  function onMsg(d){
+    if (!d) return;
+    if (d.t === 'hi' && TIPS[d.game]) { $('modeName').textContent = TIPS[d.game][0]; $('modeTip').textContent = TIPS[d.game][1]; }
+    if (d.t === 'buzz' && navigator.vibrate) { try { navigator.vibrate(Math.min(80, d.ms || 20)); } catch (_) {} }
+  }
+  function onStatus(s){
+    if (s === 'connected') status('Connected', 'ok');
+    else if (s === 'connecting') status('Connecting');
+    else if (s === 'nohost') status('Screen not found', 'warn');
+    else if (s === 'lost') status('Reconnecting', 'warn');
+    else if (s === 'offline') status('No internet', 'warn');
+  }
+
+  $('go').addEventListener('click', async () => {
+    const code = ClayLink.cleanCode(codeIn.value);
+    if (code.length !== 4) { err('The code is four letters, shown on the TV or laptop.'); return; }
+    err('');
+    const ok = await askMotion();
+    if (!ok) { err('Motion is off for this page. On iPhone, close the tab, open it again and tap Allow when asked.'); return; }
+    keepAwake();
+    try { history.replaceState(null, '', '#' + code); } catch (_) {}
+    link = ClayLink.join(code, onMsg, onStatus);
+    $('join').hidden = true; $('play').hidden = false;
+    setTimeout(() => { if (!gotOri) err('This phone is not sending motion. Try another browser, or check that motion is allowed in settings.'); }, 2500);
+  });
+  codeIn.addEventListener('keydown', e => { if (e.key === 'Enter') $('go').click(); });
+  $('center').addEventListener('click', () => { rc++; if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) {} });
+  $('leave').addEventListener('click', () => { if (link) link.close(); link = null; $('play').hidden = true; $('join').hidden = false; status('Not connected'); });
+
+  const trig = $('trigger');
+  const down = e => { e.preventDefault(); held = true; fire++; trig.classList.add('down'); if (navigator.vibrate) try { navigator.vibrate(12); } catch (_) {} };
+  const up = e => { held = false; trig.classList.remove('down'); };
+  trig.addEventListener('pointerdown', down); trig.addEventListener('pointerup', up); trig.addEventListener('pointercancel', up); trig.addEventListener('pointerleave', up);
+
+  // 60 messages a second: the whole state every time, so a dropped message costs nothing
+  let last = performance.now(), n = 0;
+  setInterval(() => {
+    if (!link) return;
+    link.send({ t: 'm', q, rr: Math.round(rr), ts: Date.now(), fire, held: held ? 1 : 0, rc });
+    n++; const now = performance.now(); if (now - last > 1000) { $('rate').textContent = gotOri ? n + ' updates/s' : 'no motion yet'; n = 0; last = now; }
+  }, 16);
+})();
+</script>
+</body></html>
