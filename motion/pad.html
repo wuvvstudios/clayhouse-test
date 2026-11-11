@@ -42,7 +42,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 .err{ color:var(--amber); font-size:14px; margin:0 }
 </style>
 </head><body>
-<header><div class="brand">Clay<b>house</b></div><div id="pill" class="pill">Not connected</div></header><p class="tip" style="margin:0;font-size:12px">Build 4</p><header hidden></header>
+<header><div class="brand">Clay<b>house</b></div><div id="pill" class="pill">Not connected</div></header><p class="tip" style="margin:0;font-size:12px">Build 5</p><header hidden></header>
 
 <section id="join">
   <h1>Turn this phone into the controller</h1>
@@ -55,15 +55,15 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 <section id="play" hidden>
   <div class="mode"><h2 id="modeName">Saber</h2><span id="rate"></span></div>
   <div id="who" class="who">Joining</div>
-  <p id="modeTip" class="tip">Hold the phone like a sword handle, top of the phone pointing up. Swing through the glowing orbs.</p>
+  <p id="modeTip" class="tip">Point the top of the phone at the screen and tap Center. Put the blade in the glowing ring where each bolt will land.</p>
   <div id="trigger" role="button" aria-label="Trigger">Trigger<small>tap to fire, hold to keep firing</small></div>
   <div class="row"><button id="center" class="ghost">Center</button><button id="leave" class="ghost">Leave</button></div>
   <p class="tip">Point the top of the phone at the screen and tap Center whenever your aim drifts.</p>
 </section>
 
 <script src="lib/peerjs.min.js"></script>
-<script src="lib/mqtt.min.js?v=4"></script>
-<script src="link.js?v=4"></script>
+<script src="lib/mqtt.min.js?v=5"></script>
+<script src="link.js?v=5"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
@@ -73,7 +73,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
   const PC = ['#5cf2cf', '#ff4fa8'];
   let link = null, q = [0,0,0,1], rr = 0, fire = 0, rc = 0, held = false, gotOri = false, sent = 0, wake = null;
   const TIPS = {
-    saber: ['Saber', 'Hold the phone like a sword handle, top of the phone pointing up. Swing through the glowing orbs.'],
+    saber: ['Saber', 'Point the top of the phone at the screen and tap Center: that holds the blade up. Tilt to put the blade in the glowing ring where each bolt will land. Stay smooth, wild swinging overheats the blade.'],
     blaster: ['Blaster', 'Hold the phone like a blaster, top of the phone pointing at the screen. Aim at the targets and tap the trigger.'],
     menu: ['Pick a game', 'Point the top of the phone at a game on the screen and tap the trigger to choose it.']
   };

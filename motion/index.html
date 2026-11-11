@@ -64,7 +64,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
     <h1>Scan with your phone to use it as the controller</h1>
     <div class="big" id="codeBig">----</div>
     <p class="how">Or open <code id="padUrl"></code> on your phone and type the four letters. Hold the phone, point the top of it at this screen, and tap Center.</p>
-    <div class="mini">Build 4 · Phone code <b id="codeMini">----</b><br><span id="phoneState">Waiting for a phone</span></div>
+    <div class="mini">Build 5 · Phone code <b id="codeMini">----</b><br><span id="phoneState">Waiting for a phone</span></div>
     <div class="btns"><button id="soundBtn">Turn on sound</button><button id="mouseBtn" class="ghost">Play with the mouse instead</button></div>
   </div>
 </div>
@@ -81,7 +81,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 <script src="lib/peerjs.min.js"></script>
 <script src="lib/mqtt.min.js?v=3"></script>
 <script src="lib/qrcode.js"></script>
-<script src="link.js?v=4"></script>
+<script src="link.js?v=5"></script>
 <script>
 (() => {
 'use strict';
@@ -89,7 +89,7 @@ const $ = id => document.getElementById(id);
 const V3 = THREE.Vector3, Q = THREE.Quaternion;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ease = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
-const PAD_HOME = 'https://wuvvstudios.github.io/clayhouse-test/motion/pad.html?v=4';   // where the phone page lives once it's hosted
+const PAD_HOME = 'https://wuvvstudios.github.io/clayhouse-test/motion/pad.html?v=5';   // where the phone page lives once it's hosted
 
 // ---------------------------------------------------------------- renderer, camera, the room
 const canvas = $('gl');
@@ -187,6 +187,8 @@ const Snd = (() => {
     pew(){ tone(1400, 0.14, 0.2, 'square', 260); noise(4000, 2, 0.06, 0.08, 'highpass'); },
     pop(){ tone(660, 0.09, 0.22, 'triangle', 1320); tone(990, 0.16, 0.14, 'sine', 1980); noise(2500, 1, 0.1, 0.18); },
     tick(){ tone(1200, 0.05, 0.08, 'sine'); },
+    charge(){ tone(300, 0.5, 0.05, 'sine', 900); },
+    deflect(steady){ tone(steady ? 1100 : 900, 0.16, 0.22, 'sawtooth', steady ? 2200 : 1500); noise(5200, 1.5, 0.12, 0.3, 'bandpass', 1800); tone(steady ? 1760 : 1320, 0.2, 0.1, 'sine'); },
     pick(){ tone(523, 0.1, 0.16, 'triangle'); setTimeout(() => tone(784, 0.18, 0.16, 'triangle'), 90); },
     end(){ [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.16, 'triangle'), i * 120)); }
   };
@@ -254,7 +256,7 @@ function takeFire(c){ if (!c){ let n = 0; P.forEach(x => { n += x.fireCount; x.f
 
 // ---------------------------------------------------------------- pairing
 let code = ClayLink.newCode(), link = null;
-function padUrl(){ const here = location.protocol === 'https:' ? new URL('pad.html?v=4', location.href).href : PAD_HOME; return here + '#' + code; }
+function padUrl(){ const here = location.protocol === 'https:' ? new URL('pad.html?v=5', location.href).href : PAD_HOME; return here + '#' + code; }
 function showPair(){
   $('codeBig').textContent = code; $('codeMini').textContent = code; $('padUrl').textContent = padUrl().replace(/^https?:\/\//, '').replace(/#.*/, '');
   try { const qr = qrcode(0, 'M'); qr.addData(padUrl()); qr.make(); $('qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch (_) { $('qr').textContent = code; }
@@ -309,7 +311,7 @@ function holo(title, sub, color, x){
   const m = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.5), new THREE.MeshBasicMaterial({ map: tex, transparent: true, fog: false })); m.position.set(x, 1.6, -4.2); m.rotation.y = -x * 0.12;
   m.userData = { draw, hi: false }; menu.add(m); return m;
 }
-const pSaber = holo('Saber', 'Swing through the orbs', '#5cf2cf', -1.45), pBlast = holo('Blaster Run', 'Ride the station together', '#ff4fa8', 1.45);
+const pSaber = holo('Saber', 'Block the drone bolts', '#5cf2cf', -1.45), pBlast = holo('Blaster Run', 'Ride the station together', '#ff4fa8', 1.45);
 function menuFrame(dt){
   const lit = new Set(); let pick = null;
   for (const c of players()){
@@ -349,7 +351,7 @@ function endRound(){
   const duo = R.duo || (R.ps[1] > 0);
   $('endTitle').textContent = mode === 'blaster' ? 'Run complete!' : 'Time!';
   $('endScore').textContent = R.score.toLocaleString();
-  const what = mode === 'saber' ? 'orbs sliced' : 'targets popped';
+  const what = mode === 'saber' ? 'bolts blocked' : 'targets popped';
   $('endNote').innerHTML = duo
     ? `Team score. <span style="color:${PCSS[0]}">Player 1 ${R.ps[0].toLocaleString()}</span> (${R.ph[0]} ${what}, best combo ${R.pb[0]}) · <span style="color:${PCSS[1]}">Player 2 ${R.ps[1].toLocaleString()}</span> (${R.ph[1]} ${what}, best combo ${R.pb[1]})`
     : `${R.hits} ${what}${mode === 'blaster' ? ' across four areas' : ''}, best combo ${R.best}`;
@@ -358,27 +360,36 @@ function endRound(){
 $('againBtn').addEventListener('click', () => startGame(mode));
 $('menuBtn').addEventListener('click', toMenu);
 
-// ---------------------------------------------------------------- SABER: orbs fly in, swing the blade through them
-// Solo, one blade just right of center. With two phones, player 1 stands left and player 2 right; each player's orbs come in
-// their colour toward their side. Slicing your own colour scores a bonus, but any orb you hit counts.
+// ---------------------------------------------------------------- SABER: training drones fire bolts, block them back
+// Drones hover at the far end of the deck. Before a drone fires, a ring appears where its bolt will arrive, shrinking as the
+// bolt gets close. Put your blade through the ring and the bolt ricochets away. Held steady, it flies straight back and knocks
+// the drone for a spin (bonus). Flailing does not work: swing wildly for more than a moment and the blade overheats and
+// sputters, and bolts pass through it until you settle down. In duos each player has their own drones and their own side,
+// and you can only block bolts in your own colour, so one player cannot cover both.
 const Saber = (() => {
   const G = new THREE.Group(); G.visible = false; scene.add(G);
-  const LEN = 1.05;
+  const LEN = 1.0, TILT = new Q().setFromAxisAngle(new V3(1, 0, 0), 1.3);     // pointing at the screen = blade up, leaning a touch forward
+  const HOT_ON = 5.2, HOT_OFF = 2.6, PERFECT = 3.2;                            // rad/s: average swing speed that overheats, cools, and counts as steady
   const metal = new THREE.MeshStandardMaterial({ color: 0xb9c0d8, metalness: 0.9, roughness: 0.25 });
   const grip = new THREE.MeshStandardMaterial({ color: 0x1b1f33, metalness: 0.3, roughness: 0.6 });
   const NT = 14;
+  const hotTex = (() => { const c = document.createElement('canvas'); c.width = 512; c.height = 128; const g = c.getContext('2d');
+    g.fillStyle = 'rgba(10,12,34,.78)'; g.beginPath(); g.roundRect ? g.roundRect(4, 14, 504, 100, 50) : g.rect(4, 14, 504, 100); g.fill();
+    g.fillStyle = '#ffb84d'; g.font = '700 46px "Space Grotesk", system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('Too wild. Hold it steady', 256, 66);
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; })();
   function makeBlade(color){
-    const B = { hilt: new THREE.Group(), pivot: new V3(0.12, 0.98, -1.25), hist: [], base: new V3(), tip: new V3() };
+    const B = { color, hilt: new THREE.Group(), pivot: new V3(0, 0.78, -1.3), dir: new V3(0, 1, 0), hist: [], base: new V3(), tip: new V3(), flail: 0, hot: false, flick: 0 };
     const hilt = B.hilt; G.add(hilt);
     const h1 = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.2, 18), grip); h1.position.y = -0.06; hilt.add(h1);
     const h2 = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.022, 0.07, 18), metal); h2.position.y = 0.065; hilt.add(h2);
     const h3 = new THREE.Mesh(new THREE.TorusGeometry(0.026, 0.006, 8, 20), metal); h3.rotation.x = Math.PI / 2; h3.position.y = -0.16; hilt.add(h3);
-    const core = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.014, LEN, 12), new THREE.MeshBasicMaterial({ color: 0xffffff })); core.position.y = 0.1 + LEN / 2; hilt.add(core);
+    B.coreM = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    B.core = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.014, LEN, 12), B.coreM); B.core.position.y = 0.1 + LEN / 2; hilt.add(B.core);
     B.glowM = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
-    const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, LEN + 0.04, 16, 1, true), B.glowM); glow.position.y = 0.1 + LEN / 2; hilt.add(glow);
-    const glow2 = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.075, LEN + 0.08, 16, 1, true), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false })); glow2.position.y = 0.1 + LEN / 2; hilt.add(glow2);
-    const bl = new THREE.PointLight(color, 1.0, 3); bl.position.y = 0.6; hilt.add(bl);
-    // a fading ribbon of the blade's last positions: the swing trail
+    B.glow = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, LEN + 0.04, 16, 1, true), B.glowM); B.glow.position.y = 0.1 + LEN / 2; hilt.add(B.glow);
+    B.glow2M = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false });
+    const glow2 = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.075, LEN + 0.08, 16, 1, true), B.glow2M); glow2.position.y = 0.1 + LEN / 2; hilt.add(glow2);
+    B.light = new THREE.PointLight(color, 1.0, 3); B.light.position.y = 0.6; hilt.add(B.light);
     B.trailPos = new Float32Array(NT * 2 * 3); B.trailA = new Float32Array(NT * 2);
     const tGeo = B.tGeo = new THREE.BufferGeometry(); tGeo.setAttribute('position', new THREE.BufferAttribute(B.trailPos, 3)); tGeo.setAttribute('alpha', new THREE.BufferAttribute(B.trailA, 1));
     const idx = []; for (let i = 0; i < NT - 1; i++){ const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } tGeo.setIndex(idx);
@@ -387,81 +398,180 @@ const Saber = (() => {
       fragmentShader: 'uniform vec3 col; varying float va; void main(){ gl_FragColor = vec4(col * va, va); }' });
     B.trail = new THREE.Mesh(tGeo, tMat); B.trail.frustumCulled = false; G.add(B.trail);
     for (let i = 0; i < NT; i++) B.hist.push({ a: new V3(0, -9, 0), b: new V3(0, -9, 0) });
+    B.warn = new THREE.Sprite(new THREE.SpriteMaterial({ map: hotTex, transparent: true, depthTest: false, depthWrite: false })); B.warn.scale.set(0.5, 0.125, 1); B.warn.renderOrder = 12; B.warn.visible = false; G.add(B.warn);
     return B;
   }
   const blades = PCOL.map(makeBlade);
-  const orbs = [], halves = [];
-  const ORB_R = 0.12;
-  const orbGeo = new THREE.SphereGeometry(ORB_R, 28, 20);
-  const halfGeo = new THREE.SphereGeometry(ORB_R, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
-  const capGeo = new THREE.CircleGeometry(ORB_R, 24);
-  const orbMats = PCOL.map(c => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.55, roughness: 0.25, metalness: 0.1 }));
-  const capMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-  const haloMats = PCOL.map(c => new THREE.SpriteMaterial({ map: glowTex, color: c, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
-  let spawnT = 0, t = 0, lastWhoosh = 0;
-  const segA = new V3(), cp = new V3(), tmp = new V3(), line = new THREE.Line3();
-  function layout(){ const pl = players(); if (pl.length > 1){ blades[0].pivot.set(-0.45, 0.98, -1.25); blades[1].pivot.set(0.45, 0.98, -1.25); } else blades[pl[0].i].pivot.set(0.12, 0.98, -1.25); return pl; }
-  function spawn(owner){
-    const B = blades[owner], m = new THREE.Mesh(orbGeo, orbMats[owner]);
-    const halo = new THREE.Sprite(haloMats[owner]); halo.scale.setScalar(0.55); m.add(halo);
-    // aim each orb at a point the owner's blade can reach, then start it far down the room
-    const ang = (Math.random() * 1.6 - 0.8), up = Math.random() * 0.9 - 0.15, r = 0.55 + Math.random() * 0.35;
-    const goal = new V3(B.pivot.x + Math.sin(ang) * r, B.pivot.y + 0.25 + up * 0.6, B.pivot.z - 0.35);
-    const start = new V3(goal.x * 1.6 + (Math.random() - 0.5) * 1.2, goal.y + (Math.random() - 0.3) * 1.2, -16);
-    const speed = 4.2 + Math.min(3, t / 20);
-    m.position.copy(start); m.userData = { owner, vel: goal.clone().sub(start).normalize().multiplyScalar(speed), spin: new V3(Math.random(), Math.random(), Math.random()).multiplyScalar(2), live: true };
-    G.add(m); orbs.push(m);
+
+  // ---- the drones: a squat glossy disc, a glowing rim, one big lens, two little fins
+  const droneBody = new THREE.MeshStandardMaterial({ color: 0x2a3060, metalness: 0.7, roughness: 0.28 });
+  const droneDark = new THREE.MeshStandardMaterial({ color: 0x0c0f24, metalness: 0.5, roughness: 0.4 });
+  const bodyGeo = new THREE.CylinderGeometry(0.26, 0.3, 0.16, 32), capGeoT = new THREE.SphereGeometry(0.2, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+  const rimGeo = new THREE.TorusGeometry(0.29, 0.018, 10, 44), lensGeo = new THREE.SphereGeometry(0.075, 20, 14), finGeo = new THREE.BoxGeometry(0.16, 0.03, 0.1);
+  function makeDrone(owner, home){
+    const col = PCOL[owner], D = new THREE.Group(); G.add(D);
+    D.add(new THREE.Mesh(bodyGeo, droneBody));
+    const top = new THREE.Mesh(capGeoT, droneBody); top.position.y = 0.06; top.scale.y = 0.55; D.add(top);
+    const bot = new THREE.Mesh(capGeoT, droneDark); bot.rotation.x = Math.PI; bot.position.y = -0.06; bot.scale.y = 0.4; D.add(bot);
+    const rimM = new THREE.MeshBasicMaterial({ color: col }); const rim = new THREE.Mesh(rimGeo, rimM); rim.rotation.x = Math.PI / 2; D.add(rim);
+    const lensM = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: col, emissiveIntensity: 0.4, metalness: 0.2, roughness: 0.1 });
+    const lens = new THREE.Mesh(lensGeo, lensM); lens.position.set(0, 0, 0.27); lens.scale.z = 0.6; D.add(lens);
+    for (const s of [-1, 1]){ const f = new THREE.Mesh(finGeo, droneDark); f.position.set(s * 0.33, 0.02, -0.04); f.rotation.z = s * 0.25; D.add(f); }
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, transparent: true, opacity: 0.0, depthWrite: false, blending: THREE.AdditiveBlending })); halo.position.copy(lens.position); halo.scale.setScalar(0.5); D.add(halo);
+    D.position.copy(home);
+    D.userData = { owner, home: home.clone(), ph: Math.random() * 6.28, lensM, rimM, halo, charge: 0, shot: null, stun: 0, spin: 0, recoil: 0, flash: 0 };
+    return D;
   }
-  function slice(o, normal, by){
-    const p = o.position.clone(), col = PCOL[o.userData.owner];
-    for (const s of [-1, 1]){
-      const h = new THREE.Group(); const sh = new THREE.Mesh(halfGeo, orbMats[o.userData.owner]); h.add(sh); const cap = new THREE.Mesh(capGeo, capMat); cap.rotation.x = Math.PI / 2; h.add(cap);
-      h.position.copy(p); h.quaternion.setFromUnitVectors(new V3(0, 1, 0), normal.clone().multiplyScalar(s));
-      h.userData = { vel: o.userData.vel.clone().multiplyScalar(0.25).addScaledVector(normal, s * 2.2).add(new V3(0, 0.8, 0)), spin: new V3(Math.random() * 6 - 3, Math.random() * 6 - 3, Math.random() * 6 - 3), life: 1.1 };
-      G.add(h); halves.push(h);
+  let drones = [], layoutKey = '';
+
+  // ---- bolts: a bright core in a coloured glow, stretched along the way it flies
+  const boltCore = new THREE.CylinderGeometry(0.018, 0.018, 0.42, 10), boltGlow = new THREE.CylinderGeometry(0.05, 0.05, 0.5, 12, 1, true);
+  const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const glowMats = PCOL.map(c => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const ringGeo = new THREE.RingGeometry(0.8, 1, 48);
+  const ringMats = PCOL.map(c => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide }));
+  const bolts = [];
+  const UP = new V3(0, 1, 0);
+  let t = 0, nextShot = [0, 0];
+
+  function layout(){
+    const pl = players();
+    if (pl.length > 1){ blades[0].pivot.set(-0.6, 0.78, -1.3); blades[1].pivot.set(0.6, 0.78, -1.3); }
+    else blades[pl[0].i].pivot.set(0, 0.78, -1.3);
+    const key = pl.map(c => c.i).join(',');
+    if (key !== layoutKey){
+      layoutKey = key; drones.forEach(d => G.remove(d)); drones = [];
+      if (pl.length > 1){
+        drones.push(makeDrone(0, new V3(-3.0, 2.3, -10.5)), makeDrone(0, new V3(-1.3, 1.5, -9.0)));
+        drones.push(makeDrone(1, new V3(1.3, 1.5, -9.0)), makeDrone(1, new V3(3.0, 2.3, -10.5)));
+      } else { const o = pl[0].i; drones.push(makeDrone(o, new V3(-2.4, 2.0, -10)), makeDrone(o, new V3(0, 2.7, -11.5)), makeDrone(o, new V3(2.4, 1.6, -9.5))); }
+      bolts.splice(0).forEach(b => { G.remove(b); if (b.userData.ring) G.remove(b.userData.ring); });
     }
-    burst(p, col, 34, 3.2); Snd.slice(); award(by, o.userData.owner === by ? 120 : 100);
-    G.remove(o); o.userData.live = false;
+    return pl;
+  }
+
+  // where on the blade's sweep a bolt will arrive: some lean left or right, some higher or lower along the blade
+  function pickTarget(B){
+    const a = (Math.random() * 2 - 1) * 1.05, r = 0.42 + Math.random() * 0.52;
+    const d = new V3(Math.sin(a), Math.cos(a), 0).applyQuaternion(new Q().setFromAxisAngle(new V3(1, 0, 0), -0.27 * Math.cos(a)));
+    return B.pivot.clone().addScaledVector(d, 0.1 + r);
+  }
+  function fire(owner){
+    const free = drones.filter(d => d.userData.owner === owner && !d.userData.charge && d.userData.stun <= 0);
+    if (!free.length) return false;
+    const D = free[(Math.random() * free.length) | 0], u = D.userData, B = blades[owner];
+    const target = pickTarget(B);
+    const flight = Math.max(0.72, 1.05 - t / 160), charge = 0.6;
+    const ring = new THREE.Mesh(ringGeo, ringMats[owner]); ring.position.copy(target); ring.renderOrder = 11; G.add(ring);
+    u.charge = charge; u.shot = { target, flight, ring, total: charge + flight };
+    Snd.charge && Snd.charge();
+    return true;
+  }
+  function launch(D){
+    const u = D.userData, s = u.shot; u.shot = null; u.recoil = 1;
+    const b = new THREE.Group(); b.add(new THREE.Mesh(boltCore, coreMat)); b.add(new THREE.Mesh(boltGlow, glowMats[u.owner]));
+    const from = D.position.clone().add(new V3(0, 0, 0.3));
+    const vel = s.target.clone().sub(from); const dist = vel.length(); vel.multiplyScalar(1 / s.flight);
+    b.position.copy(from); b.quaternion.setFromUnitVectors(UP, vel.clone().normalize());
+    b.userData = { owner: u.owner, src: D, vel, prev: from.clone(), state: 'in', ring: s.ring, ringT: 0, flight: s.flight, life: 3, target: s.target };
+    G.add(b); bolts.push(b); Snd.pew();
+  }
+  // closest distance between segment p1-q1 and segment p2-q2
+  const _d1 = new V3(), _d2 = new V3(), _r = new V3(), _c1 = new V3(), _c2 = new V3();
+  function segDist(p1, q1, p2, q2){
+    _d1.subVectors(q1, p1); _d2.subVectors(q2, p2); _r.subVectors(p1, p2);
+    const a = _d1.dot(_d1), e = _d2.dot(_d2), f = _d2.dot(_r); let s, tt;
+    if (a < 1e-9 && e < 1e-9) return _r.length();
+    if (a < 1e-9){ s = 0; tt = clamp(f / e, 0, 1); }
+    else { const c = _d1.dot(_r); if (e < 1e-9){ tt = 0; s = clamp(-c / a, 0, 1); } else { const b = _d1.dot(_d2), den = a * e - b * b;
+      s = den > 1e-9 ? clamp((b * f - c * e) / den, 0, 1) : 0; tt = (b * s + f) / e; if (tt < 0){ tt = 0; s = clamp(-c / a, 0, 1); } else if (tt > 1){ tt = 1; s = clamp((b - c) / a, 0, 1); } } }
+    _c1.copy(p1).addScaledVector(_d1, s); _c2.copy(p2).addScaledVector(_d2, tt); return _c1.distanceTo(_c2);
+  }
+  function deflect(b, c, B){
+    const u = b.userData, steady = B.flail < PERFECT;
+    const p = b.position.clone(); burst(p, PCOL[u.owner], 30, 3.4); burst(p, 0xffffff, 10, 2.2);
+    if (u.ring){ G.remove(u.ring); u.ring = null; }
+    const sp = u.vel.length() * 1.25;
+    if (steady && u.src && u.src.parent){ u.state = 'home'; u.vel.copy(u.src.position).sub(p).normalize().multiplyScalar(sp); }
+    else { u.state = 'away'; u.vel.set((p.x - B.pivot.x) * 3 + (Math.random() - 0.5) * 3, 1.5 + Math.random() * 2, -sp * 0.8); }
+    b.quaternion.setFromUnitVectors(UP, _b.copy(u.vel).normalize());
+    Snd.deflect ? Snd.deflect(steady) : Snd.slice(); award(c.i, 100);
+    if (link && c.pid) link.send({ t: 'buzz', pid: c.pid, ms: 40 });
+  }
+  function bladeFrame(c, dt){
+    const B = blades[c.i];
+    B.dir.copy(c.dir).applyQuaternion(TILT);
+    if (B.dir.y < -0.15){ B.dir.y = -0.15; B.dir.normalize(); }
+    B.hilt.position.copy(B.pivot); B.hilt.quaternion.setFromUnitVectors(UP, B.dir);
+    B.base.copy(B.pivot).addScaledVector(B.dir, 0.1); B.tip.copy(B.pivot).addScaledVector(B.dir, 0.1 + LEN);
+    // the anti-flail meter: a running average of how fast the blade is moving
+    B.flail += (c.speed - B.flail) * (1 - Math.exp(-dt / 0.45));
+    if (!B.hot && B.flail > HOT_ON){ B.hot = true; if (link && c.pid) link.send({ t: 'buzz', pid: c.pid, ms: 60 }); }
+    else if (B.hot && B.flail < HOT_OFF) B.hot = false;
+    B.flick += dt;
+    const sp = c.speed, sputter = B.hot ? (Math.sin(B.flick * 47) * Math.sin(B.flick * 13) > 0.1 ? 0.15 : 0.55) : 1;
+    B.glowM.opacity = (0.32 + Math.min(0.3, sp * 0.03)) * sputter; B.glow2M.opacity = 0.12 * sputter; B.light.intensity = sputter;
+    B.coreM.color.setHex(B.hot ? 0xffd9a0 : 0xffffff); B.glow.scale.x = B.glow.scale.z = B.hot ? 0.7 : 1;
+    B.warn.visible = B.hot && R.on; B.warn.position.copy(B.pivot).add(new V3(0, 0.62, 0.25));
+    B.hist.pop(); B.hist.unshift({ a: B.base.clone(), b: B.tip.clone() });
+    for (let i = 0; i < NT; i++){ const h = B.hist[i]; B.trailPos.set([h.a.x, h.a.y, h.a.z], i * 6); B.trailPos.set([h.b.x, h.b.y, h.b.z], i * 6 + 3); const a = (1 - i / NT) * Math.min(1, sp / 8) * 0.22 * sputter; B.trailA[i * 2] = a * 0.3; B.trailA[i * 2 + 1] = a; }
+    B.tGeo.attributes.position.needsUpdate = true; B.tGeo.attributes.alpha.needsUpdate = true;
+    return sp;
   }
   return {
-    start(){ G.visible = true; t = 0; spawnT = 0.6; blades.forEach(B => B.hist.forEach(h => { h.a.set(0, -9, 0); h.b.set(0, -9, 0); })); Snd.humStart(); },
-    stop(){ G.visible = false; orbs.splice(0).forEach(o => G.remove(o)); halves.splice(0).forEach(h => G.remove(h)); Snd.humStop(); },
+    get blades(){ return blades; }, get bolts(){ return bolts; }, get drones(){ return drones; },
+    start(){ G.visible = true; t = 0; nextShot = [1.2, 1.9]; layoutKey = ''; blades.forEach(B => { B.flail = 0; B.hot = false; B.hist.forEach(h => { h.a.set(0, -9, 0); h.b.set(0, -9, 0); }); }); Snd.humStart(); },
+    stop(){ G.visible = false; bolts.splice(0).forEach(b => { G.remove(b); if (b.userData.ring) G.remove(b.userData.ring); }); drones.forEach(d => { d.userData.charge = 0; if (d.userData.shot){ G.remove(d.userData.shot.ring); d.userData.shot = null; } }); blades.forEach(B => B.warn.visible = false); Snd.humStop(); },
     frame(dt){
       t += dt;
       const pl = layout(); let top = 0;
-      blades.forEach((B, i) => { const on = pl.some(c => c.i === i); B.hilt.visible = on; B.trail.visible = on; });
-      // each blade: from its hand, along that phone's pointing direction
-      for (const c of pl){
-        const B = blades[c.i];
-        B.hilt.position.copy(B.pivot); B.hilt.quaternion.setFromUnitVectors(new V3(0, 1, 0), c.dir);
-        B.base.copy(B.pivot).addScaledVector(c.dir, 0.1); B.tip.copy(B.pivot).addScaledVector(c.dir, 0.1 + LEN);
-        const sp = c.speed; top = Math.max(top, sp); B.glowM.opacity = 0.32 + Math.min(0.3, sp * 0.03);
-        B.hist.pop(); B.hist.unshift({ a: B.base.clone(), b: B.tip.clone() });
-        for (let i = 0; i < NT; i++){ const h = B.hist[i]; B.trailPos.set([h.a.x, h.a.y, h.a.z], i * 6); B.trailPos.set([h.b.x, h.b.y, h.b.z], i * 6 + 3); const a = (1 - i / NT) * Math.min(1, sp / 8) * 0.3; B.trailA[i * 2] = a * 0.3; B.trailA[i * 2 + 1] = a; }
-        B.tGeo.attributes.position.needsUpdate = true; B.tGeo.attributes.alpha.needsUpdate = true;
+      blades.forEach((B, i) => { const on = pl.some(c => c.i === i); B.hilt.visible = on; B.trail.visible = on; if (!on) B.warn.visible = false; });
+      for (const c of pl) top = Math.max(top, bladeFrame(c, dt));
+      Snd.humSet(Math.min(top, 6));
+      // drones bob and drift; a charging drone's lens heats up, a struck one spins
+      for (const D of drones){
+        const u = D.userData; u.ph += dt;
+        D.position.set(u.home.x + Math.sin(u.ph * 0.45) * 0.5, u.home.y + Math.sin(u.ph * 1.3) * 0.12, u.home.z - u.recoil * 0.25);
+        u.recoil = Math.max(0, u.recoil - dt * 4); u.stun = Math.max(0, u.stun - dt);
+        if (u.spin > 0){ u.spin = Math.max(0, u.spin - dt); D.rotation.y += dt * 14 * u.spin; D.rotation.z = Math.sin(u.ph * 18) * 0.3 * u.spin; }
+        else { D.rotation.z *= 0.9; D.rotation.y += (0 - wrap(D.rotation.y)) * 0.15; D.lookAt(cam.position.x, D.position.y - 0.3, cam.position.z); }
+        const heat = u.shot ? 1 - u.charge / 0.6 : 0;
+        u.lensM.emissiveIntensity = 0.4 + heat * 2.4 + u.flash * 3; u.halo.material.opacity = heat * 0.9 + u.flash; u.halo.scale.setScalar(0.4 + heat * 0.5);
+        u.rimM.color.setHex(u.flash > 0.05 ? 0xffffff : PCOL[u.owner]); u.flash = Math.max(0, u.flash - dt * 2.5);
+        if (u.shot){
+          const s = u.shot; s.ring.quaternion.copy(cam.quaternion); s.ring.material.opacity = 0.35 + 0.45 * heat;
+          s.ring.scale.setScalar(0.24 - 0.06 * heat);
+          if (R.on){ u.charge -= dt; if (u.charge <= 0){ u.charge = 0; launch(D); } }
+        }
       }
-      Snd.humSet(top); if (top > 5 && t - lastWhoosh > 0.25){ lastWhoosh = t; Snd.whoosh(Math.min(1, top / 12)); }
       if (!R.on) return;
       R.time -= dt; if (R.time <= 0){ R.time = 0; endRound(); }
-      spawnT -= dt;
-      if (spawnT <= 0){ const per = pl.length > 1 ? 0.75 : 1; for (const c of pl){ spawn(c.i); if (Math.random() < Math.min(0.45, t / 90) * per) spawn(c.i); } spawnT = Math.max(0.42, 1.0 - t / 70) * (pl.length > 1 ? 1.25 : 1); }
-      for (let i = orbs.length - 1; i >= 0; i--){
-        const o = orbs[i], u = o.userData; if (!u.live){ orbs.splice(i, 1); continue; }
-        o.position.addScaledVector(u.vel, dt); o.rotation.x += u.spin.x * dt; o.rotation.y += u.spin.y * dt;
-        let cut = false;
-        for (const c of pl){
-          const B = blades[c.i]; if (c.speed <= 2.0) continue;
-          // swept test: the blade from its last pose to this one, against the orb
-          line.set(B.base, B.tip); let d = line.closestPointToPoint(o.position, true, cp).distanceTo(o.position);
-          const prev = B.hist[1]; if (prev && prev.a.y > -5){ line.set(B.base, tmp.copy(prev.b).lerp(B.tip, 0.5)); d = Math.min(d, line.closestPointToPoint(o.position, true, cp).distanceTo(o.position)); }
-          if (d < ORB_R + 0.05){ const n = tmp.crossVectors(c.dir, c.omega.lengthSq() > 1e-4 ? c.omega : new V3(0, 0, 1)).normalize(); if (!isFinite(n.x)) n.set(1, 0, 0);
-            slice(o, n.clone(), c.i); cut = true; break; }
-        }
-        if (cut){ orbs.splice(i, 1); continue; }
-        if (o.position.z > -0.35){ G.remove(o); orbs.splice(i, 1); breakCombo(u.owner); }           // a miss just ends that player's combo, no penalty
+      // each player gets shots on their own clock; the pace picks up over the round
+      for (const c of pl){
+        nextShot[c.i] -= dt;
+        const live = bolts.filter(b => b.userData.owner === c.i && b.userData.state === 'in').length + drones.filter(d => d.userData.owner === c.i && d.userData.shot).length;
+        const cap = t < 15 ? 1 : t < 35 ? 2 : 3;
+        if (nextShot[c.i] <= 0 && live < cap){ if (fire(c.i)) nextShot[c.i] = Math.max(0.55, 1.5 - t / 45) * (0.8 + Math.random() * 0.4); }
       }
-      for (let i = halves.length - 1; i >= 0; i--){ const h = halves[i], u = h.userData; u.life -= dt; u.vel.y -= 6 * dt; h.position.addScaledVector(u.vel, dt);
-        h.rotation.x += u.spin.x * dt; h.rotation.y += u.spin.y * dt; h.scale.setScalar(Math.max(0.01, Math.min(1, u.life * 2))); if (u.life <= 0){ G.remove(h); halves.splice(i, 1); } }
+      for (let i = bolts.length - 1; i >= 0; i--){
+        const b = bolts[i], u = b.userData; u.life -= dt;
+        u.prev.copy(b.position); b.position.addScaledVector(u.vel, dt);
+        if (u.state === 'in'){
+          u.ringT += dt; if (u.ring){ u.ring.quaternion.copy(cam.quaternion); const k = clamp(u.ringT / u.flight, 0, 1); u.ring.scale.setScalar(0.12 * (1 - k) + 0.06); u.ring.material.opacity = 0.8; }
+          // only the owner's blade can block it, and only while that blade is not overheated
+          const c = pl.find(x => x.i === u.owner), B = blades[u.owner];
+          if (c && !B.hot && segDist(u.prev, b.position, B.base, B.tip) < 0.095){ deflect(b, c, B); continue; }
+          if (b.position.z > B.pivot.z + 0.45){ breakCombo(u.owner); if (u.ring){ G.remove(u.ring); u.ring = null; } u.state = 'past'; u.life = Math.min(u.life, 0.22); }
+        } else if (u.state === 'home'){
+          const D = u.src; if (D && D.parent && b.position.distanceTo(D.position) < 0.4){
+            const du = D.userData; du.spin = 1.2; du.stun = 1.6; du.flash = 1; if (du.shot){ G.remove(du.shot.ring); du.shot = null; du.charge = 0; }
+            burst(D.position, 0xffffff, 26, 3); burst(D.position, PCOL[du.owner], 30, 4); Snd.pop(); award(u.owner, 50);
+            G.remove(b); bolts.splice(i, 1); continue;
+          }
+        }
+        if (u.state === 'past'){ b.scale.setScalar(Math.max(0.01, u.life * 4.5)); if (b.position.z > 0.2){ G.remove(b); bolts.splice(i, 1); continue; } }
+        if (u.life <= 0 || b.position.z < -20 || b.position.y > 6){ if (u.ring) G.remove(u.ring); G.remove(b); bolts.splice(i, 1); }
+      }
     }
   };
 })();
@@ -672,7 +782,7 @@ function loop(){
   renderer.render(scene, cam);
 }
 loop();
-window.__motion = { Ctrl, P, Mouse, R, onPhone, VIEW, Blaster, cam, startGame, toMenu, tick(n, dt){ for (let i = 0; i < n; i++){ scene.updateMatrixWorld(); ctrlFrame(dt); if (mode === 'saber') Saber.frame(dt); else if (mode === 'blaster') Blaster.frame(dt); else if (mode === 'menu') menuFrame(dt); sparkFrame(dt); } }, get mode(){ return mode; }, code: () => code };
+window.__saber = Saber; window.__motion = { Ctrl, P, Mouse, R, onPhone, VIEW, Blaster, cam, startGame, toMenu, tick(n, dt){ for (let i = 0; i < n; i++){ scene.updateMatrixWorld(); ctrlFrame(dt); if (mode === 'saber') Saber.frame(dt); else if (mode === 'blaster') Blaster.frame(dt); else if (mode === 'menu') menuFrame(dt); sparkFrame(dt); } }, get mode(){ return mode; }, code: () => code };
 })();
 </script>
 </body></html>
