@@ -32,6 +32,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 .mode{ display:flex; align-items:baseline; justify-content:space-between; gap:10px }
 .mode h2{ font-family:var(--disp); font-size:26px; margin:0 }
 .mode span{ color:var(--dim); font-size:13px }
+.who{ font-family:var(--disp); font-weight:700; font-size:18px; color:var(--dim) }
 .tip{ color:var(--dim); font-size:14px; line-height:1.45; margin:0 }
 #trigger{ flex:1; min-height:180px; border-radius:22px; border:2px solid var(--line); background:radial-gradient(circle at 50% 45%, #231a4f 0%, var(--panel) 70%);
   display:flex; align-items:center; justify-content:center; flex-direction:column; gap:6px; font-family:var(--disp); font-size:28px; color:var(--fg); touch-action:none; transition:transform .05s }
@@ -41,7 +42,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 .err{ color:var(--amber); font-size:14px; margin:0 }
 </style>
 </head><body>
-<header><div class="brand">Clay<b>house</b></div><div id="pill" class="pill">Not connected</div></header><p class="tip" style="margin:0;font-size:12px">Build 3</p><header hidden></header>
+<header><div class="brand">Clay<b>house</b></div><div id="pill" class="pill">Not connected</div></header><p class="tip" style="margin:0;font-size:12px">Build 4</p><header hidden></header>
 
 <section id="join">
   <h1>Turn this phone into the controller</h1>
@@ -53,6 +54,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 
 <section id="play" hidden>
   <div class="mode"><h2 id="modeName">Saber</h2><span id="rate"></span></div>
+  <div id="who" class="who">Joining</div>
   <p id="modeTip" class="tip">Hold the phone like a sword handle, top of the phone pointing up. Swing through the glowing orbs.</p>
   <div id="trigger" role="button" aria-label="Trigger">Trigger<small>tap to fire, hold to keep firing</small></div>
   <div class="row"><button id="center" class="ghost">Center</button><button id="leave" class="ghost">Leave</button></div>
@@ -60,12 +62,15 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 </section>
 
 <script src="lib/peerjs.min.js"></script>
-<script src="lib/mqtt.min.js?v=3"></script>
-<script src="link.js?v=3"></script>
+<script src="lib/mqtt.min.js?v=4"></script>
+<script src="link.js?v=4"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
   const pill = $('pill'), codeIn = $('code');
+  let pid = ''; try { pid = sessionStorage.getItem('chPid') || ''; } catch (_) {}
+  if (!pid){ pid = Math.random().toString(36).slice(2, 10); try { sessionStorage.setItem('chPid', pid); } catch (_) {} }
+  const PC = ['#5cf2cf', '#ff4fa8'];
   let link = null, q = [0,0,0,1], rr = 0, fire = 0, rc = 0, held = false, gotOri = false, sent = 0, wake = null;
   const TIPS = {
     saber: ['Saber', 'Hold the phone like a sword handle, top of the phone pointing up. Swing through the glowing orbs.'],
@@ -105,8 +110,13 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
   function onMsg(d){
     if (!d) return;
     if (d.t === 'hi' && TIPS[d.game]) { $('modeName').textContent = TIPS[d.game][0]; $('modeTip').textContent = TIPS[d.game][1]; }
-    if (d.t === 'buzz' && navigator.vibrate) { try { navigator.vibrate(Math.min(80, d.ms || 20)); } catch (_) {} }
+    if (d.t === 'hi' && d.slots && d.slots[pid] !== undefined) setPlayer(d.slots[pid]);
+    if (d.t === 'full' && d.pid === pid) status('Game full: two players already in', 'warn');
+    if (d.t === 'buzz' && (!d.pid || d.pid === pid) && navigator.vibrate) { try { navigator.vibrate(Math.min(80, d.ms || 20)); } catch (_) {} }
   }
+  let slot = -1;
+  function setPlayer(i){ if (i === slot) return; slot = i; const c = PC[i] || PC[0];
+    document.documentElement.style.setProperty('--mint', c); $('who').textContent = 'Player ' + (i + 1); $('who').style.color = c; $('trigger').style.borderColor = c; }
   function onStatus(s){
     if (s === 'direct') status('Connected', 'ok');
     else if (s === 'relay') status('Connected (relay)', 'ok');
@@ -129,7 +139,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
   });
   codeIn.addEventListener('keydown', e => { if (e.key === 'Enter') $('go').click(); });
   $('center').addEventListener('click', () => { rc++; if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) {} });
-  $('leave').addEventListener('click', () => { if (link) link.close(); link = null; $('play').hidden = true; $('join').hidden = false; status('Not connected'); });
+  $('leave').addEventListener('click', () => { if (link) link.close(); link = null; $('play').hidden = true; $('join').hidden = false; status('Not connected'); slot = -1; });
 
   const trig = $('trigger');
   const down = e => { e.preventDefault(); held = true; fire++; trig.classList.add('down'); if (navigator.vibrate) try { navigator.vibrate(12); } catch (_) {} };
@@ -140,7 +150,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
   let last = performance.now(), n = 0;
   setInterval(() => {
     if (!link) return;
-    link.send({ t: 'm', q, rr: Math.round(rr), ts: Date.now(), fire, held: held ? 1 : 0, rc });
+    link.send({ t: 'm', pid, q, rr: Math.round(rr), ts: Date.now(), fire, held: held ? 1 : 0, rc });
     n++; const now = performance.now(); if (now - last > 1000) { $('rate').textContent = gotOri ? n + ' updates/s' : 'no motion yet'; n = 0; last = now; }
   }, 16);
 })();

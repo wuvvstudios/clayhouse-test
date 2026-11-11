@@ -20,7 +20,7 @@ canvas#gl{ position:fixed; inset:0; width:100%; height:100%; display:block }
 .stat{ display:flex; flex-direction:column; align-items:flex-end; gap:2px }
 .stat small{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim) }
 .stat span{ font-family:var(--disp); font-weight:700; font-size:clamp(22px,2.8vw,40px) }
-#combo span{ color:var(--pink) }
+.stat b{ font-weight:700 } .p1 b{ color:var(--mint) } .p2 b{ color:var(--pink) } .cmb{ font-style:normal; font-size:.5em; color:var(--dim); margin-right:8px; vertical-align:middle }
 .card{ position:fixed; background:var(--panel); border:1px solid var(--line); border-radius:22px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px) }
 #pair{ left:50%; top:50%; transform:translate(-50%,-50%); width:min(760px,calc(100% - 32px)); padding:clamp(18px,3vw,34px); display:grid; grid-template-columns:auto 1fr; gap:clamp(16px,3vw,34px); align-items:center }
 #pair.corner{ left:auto; top:auto; right:max(18px,env(safe-area-inset-right)); bottom:max(18px,env(safe-area-inset-bottom)); transform:none; width:auto; padding:12px 16px; grid-template-columns:auto auto; gap:12px; border-radius:16px }
@@ -52,8 +52,8 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 <div class="hud">
   <div class="game" id="gameName">Clay<b>house</b> Motion</div>
   <div class="stats" id="stats" hidden>
-    <div class="stat" id="combo"><small>Combo</small><span id="comboV">0</span></div>
-    <div class="stat"><small>Score</small><span id="scoreV">0</span></div>
+    <div class="stat p1"><small id="s1L">Score</small><span><i id="c1V" class="cmb"></i><b id="s1V">0</b></span></div>
+    <div class="stat p2" id="p2stat" hidden><small>Player 2</small><span><i id="c2V" class="cmb"></i><b id="s2V">0</b></span></div>
     <div class="stat"><small id="timeL">Time</small><span id="timeV">60</span></div>
   </div>
 </div>
@@ -64,7 +64,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
     <h1>Scan with your phone to use it as the controller</h1>
     <div class="big" id="codeBig">----</div>
     <p class="how">Or open <code id="padUrl"></code> on your phone and type the four letters. Hold the phone, point the top of it at this screen, and tap Center.</p>
-    <div class="mini">Build 3 · Phone code <b id="codeMini">----</b><br><span id="phoneState">Waiting for a phone</span></div>
+    <div class="mini">Build 4 · Phone code <b id="codeMini">----</b><br><span id="phoneState">Waiting for a phone</span></div>
     <div class="btns"><button id="soundBtn">Turn on sound</button><button id="mouseBtn" class="ghost">Play with the mouse instead</button></div>
   </div>
 </div>
@@ -81,7 +81,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 <script src="lib/peerjs.min.js"></script>
 <script src="lib/mqtt.min.js?v=3"></script>
 <script src="lib/qrcode.js"></script>
-<script src="link.js?v=3"></script>
+<script src="link.js?v=4"></script>
 <script>
 (() => {
 'use strict';
@@ -89,7 +89,7 @@ const $ = id => document.getElementById(id);
 const V3 = THREE.Vector3, Q = THREE.Quaternion;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ease = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
-const PAD_HOME = 'https://wuvvstudios.github.io/clayhouse-test/motion/pad.html?v=3';   // where the phone page lives once it's hosted
+const PAD_HOME = 'https://wuvvstudios.github.io/clayhouse-test/motion/pad.html?v=4';   // where the phone page lives once it's hosted
 
 // ---------------------------------------------------------------- renderer, camera, the room
 const canvas = $('gl');
@@ -192,76 +192,107 @@ const Snd = (() => {
   };
 })();
 
-// ---------------------------------------------------------------- the controller: phone orientation (or the mouse) to a pointing direction
-// The phone sends its orientation 60 times a second. The direction its top points becomes a heading and a pitch, measured from
-// where it pointed when you tapped Center. A small prediction (45 ms of the current turning speed) hides the network delay.
-const Ctrl = { phone: false, lastMsg: 0, dir: new V3(0, 0, -1), raw: new V3(0, 0, -1), prev: new V3(0, 0, -1), prevT: 0, omega: new V3(), speed: 0,
-  h0: null, p0: 0, rc: -1, fire: -1, fireCount: 0, held: false, mouse: { x: 0, y: 0, down: false, used: false }, mouseFire: 0 };
+// ---------------------------------------------------------------- the controllers: up to two phones (or the mouse as player 1)
+// Each phone sends its orientation about 60 times a second. The direction its top points becomes a heading and a pitch,
+// measured from where it pointed when that player tapped Center. A small prediction (45 ms of the current turning speed)
+// hides the network delay. Phones are told apart by an id they make up when the page opens.
+const PCOL = [0x5cf2cf, 0xff4fa8], PCSS = ['#5cf2cf', '#ff4fa8'];
+function makeCtrl(i){ return { i, pid: null, phone: false, lastMsg: 0, dir: new V3(0, 0, -1), raw: new V3(0, 0, -1), prev: new V3(0, 0, -1), prevT: 0, omega: new V3(), speed: 0,
+  h0: null, p0: 0, rc: -1, fire: -1, fireCount: 0, held: false }; }
+const P = [makeCtrl(0), makeCtrl(1)];
+const Ctrl = P[0];                                        // player 1 (kept for tests)
+const Mouse = { x: 0, y: 0, down: false, used: false };
 const _q = new Q(), _b = new V3(), _ax = new V3(), _qq = new Q();
 function dirFromHP(h, p, out){ return out.set(Math.sin(h) * Math.cos(p), Math.sin(p), -Math.cos(h) * Math.cos(p)); }
 function wrap(a){ while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
+const phones = () => P.filter(c => c.phone);
+// the players in this round: every connected phone, or player 1 on the mouse when no phone is connected
+function players(){ const ph = phones(); return ph.length ? ph : [P[0]]; }
+function slots(){ const s = {}; P.forEach(c => { if (c.pid) s[c.pid] = c.i; }); return s; }
 function onPhone(m){
   if (!m || m.t !== 'm' || !m.q) return;
+  const pid = m.pid || 'solo';
+  let c = P.find(x => x.pid === pid);
+  if (!c){
+    c = P.find(x => !x.pid); if (!c){ if (link) link.send({ t: 'full', pid }); return; }
+    Object.assign(c, { pid, h0: null, rc: -1, fire: -1, fireCount: 0, phone: true, lastMsg: performance.now() / 1000 });
+    toast(`Player ${c.i + 1} joined. Point your phone at the screen and tap Center.`); playersChanged();
+  }
   const now = performance.now() / 1000;
   _q.set(m.q[0], m.q[1], m.q[2], m.q[3]); _b.set(0, 1, 0).applyQuaternion(_q);            // top of the phone, earth frame (x east, y north, z up)
   const h = Math.atan2(_b.x, _b.y), p = Math.asin(clamp(_b.z, -1, 1));
-  if (m.rc !== Ctrl.rc || Ctrl.h0 === null){ Ctrl.rc = m.rc; Ctrl.h0 = h; Ctrl.p0 = p; toast('Centered'); }
-  const dh = wrap(h - Ctrl.h0), dp = clamp(p - Ctrl.p0, -1.5, 1.5);
-  Ctrl.prev.copy(Ctrl.raw); dirFromHP(dh, dp, Ctrl.raw);
-  const dt = Ctrl.prevT ? clamp(now - Ctrl.prevT, 0.004, 0.2) : 0.016; Ctrl.prevT = now;
-  _ax.crossVectors(Ctrl.prev, Ctrl.raw); const ang = Math.asin(clamp(_ax.length(), 0, 1));
-  if (ang > 1e-5) Ctrl.omega.copy(_ax.normalize()).multiplyScalar(ang / dt).lerp(Ctrl.omega, 0.35); else Ctrl.omega.multiplyScalar(0.5);
-  Ctrl.speed = Math.max(Ctrl.omega.length(), (m.rr || 0) * Math.PI / 180 * 0.85);
-  if (Ctrl.fire !== m.fire){ if (Ctrl.fire >= 0 && m.fire > Ctrl.fire) Ctrl.fireCount += m.fire - Ctrl.fire; Ctrl.fire = m.fire; }
-  Ctrl.held = !!m.held; Ctrl.phone = true; Ctrl.lastMsg = now;
+  if (m.rc !== c.rc || c.h0 === null){ const first = c.h0 === null; c.rc = m.rc; c.h0 = h; c.p0 = p; if (!first) toast(`Player ${c.i + 1} centered`); }
+  const dh = wrap(h - c.h0), dp = clamp(p - c.p0, -1.5, 1.5);
+  c.prev.copy(c.raw); dirFromHP(dh, dp, c.raw);
+  const dt = c.prevT ? clamp(now - c.prevT, 0.004, 0.2) : 0.016; c.prevT = now;
+  _ax.crossVectors(c.prev, c.raw); const ang = Math.asin(clamp(_ax.length(), 0, 1));
+  if (ang > 1e-5) c.omega.copy(_ax.normalize()).multiplyScalar(ang / dt).lerp(c.omega, 0.35); else c.omega.multiplyScalar(0.5);
+  c.speed = Math.max(c.omega.length(), (m.rr || 0) * Math.PI / 180 * 0.85);
+  if (c.fire !== m.fire){ if (c.fire >= 0 && m.fire > c.fire) c.fireCount += m.fire - c.fire; c.fire = m.fire; }
+  c.held = !!m.held; c.phone = true; c.lastMsg = now;
 }
 function ctrlFrame(dt){
   const now = performance.now() / 1000;
-  if (Ctrl.phone && now - Ctrl.lastMsg > 2.5){ Ctrl.phone = false; setPhoneState(false); }
-  if (Ctrl.phone){
-    // predict ahead along the current turn, then ease toward it
-    const lead = 0.045, w = Ctrl.omega.length();
-    const target = _b.copy(Ctrl.raw); if (w > 0.05){ _qq.setFromAxisAngle(_ax.copy(Ctrl.omega).normalize(), Math.min(w * lead, 0.35)); target.applyQuaternion(_qq); }
-    Ctrl.dir.lerp(target, 1 - Math.exp(-dt * 40)).normalize();
-  } else {
-    const prev = _b.copy(Ctrl.dir); dirFromHP(Ctrl.mouse.x * 1.05, Ctrl.mouse.y * 0.75, Ctrl.dir);
-    const ang = Math.acos(clamp(prev.dot(Ctrl.dir), -1, 1)); Ctrl.speed += (ang / Math.max(dt, 0.001) - Ctrl.speed) * 0.5; Ctrl.held = Ctrl.mouse.down;
+  for (const c of P){
+    if (c.phone && now - c.lastMsg > 2.5){ c.phone = false; c.pid = null; toast(`Player ${c.i + 1} left`); playersChanged(); }
+    if (c.phone){
+      // predict ahead along the current turn, then ease toward it
+      const lead = 0.045, w = c.omega.length();
+      const target = _b.copy(c.raw); if (w > 0.05){ _qq.setFromAxisAngle(_ax.copy(c.omega).normalize(), Math.min(w * lead, 0.35)); target.applyQuaternion(_qq); }
+      c.dir.lerp(target, 1 - Math.exp(-dt * 40)).normalize();
+    } else if (c.i === 0){
+      const prev = _b.copy(c.dir); dirFromHP(Mouse.x * 1.05, Mouse.y * 0.75, c.dir);
+      const ang = Math.acos(clamp(prev.dot(c.dir), -1, 1)); c.speed += (ang / Math.max(dt, 0.001) - c.speed) * 0.5; c.held = Mouse.down;
+    }
   }
 }
-addEventListener('pointermove', e => { Ctrl.mouse.x = e.clientX / innerWidth * 2 - 1; Ctrl.mouse.y = -(e.clientY / innerHeight * 2 - 1); Ctrl.mouse.used = true; });
-canvas.addEventListener('pointerdown', e => { Ctrl.mouse.down = true; if (!Ctrl.phone) Ctrl.fireCount++; Snd.init(); });
-addEventListener('pointerup', () => { Ctrl.mouse.down = false; });
-addEventListener('keydown', e => { Snd.init(); if (e.key === 'c' || e.key === 'C') { Ctrl.h0 = null; } if (e.key === 'Escape') toMenu(); });
-function takeFire(){ const n = Ctrl.fireCount; Ctrl.fireCount = 0; return n; }
+addEventListener('pointermove', e => { Mouse.x = e.clientX / innerWidth * 2 - 1; Mouse.y = -(e.clientY / innerHeight * 2 - 1); Mouse.used = true; });
+canvas.addEventListener('pointerdown', e => { Mouse.down = true; if (!P[0].phone) P[0].fireCount++; Snd.init(); });
+addEventListener('pointerup', () => { Mouse.down = false; });
+addEventListener('keydown', e => { Snd.init(); if (e.key === 'c' || e.key === 'C') P.forEach(c => c.h0 = null); if (e.key === 'Escape') toMenu(); });
+function takeFire(c){ if (!c){ let n = 0; P.forEach(x => { n += x.fireCount; x.fireCount = 0; }); return n; } const n = c.fireCount; c.fireCount = 0; return n; }
 
 // ---------------------------------------------------------------- pairing
 let code = ClayLink.newCode(), link = null;
-function padUrl(){ const here = location.protocol === 'https:' ? new URL('pad.html?v=3', location.href).href : PAD_HOME; return here + '#' + code; }
+function padUrl(){ const here = location.protocol === 'https:' ? new URL('pad.html?v=4', location.href).href : PAD_HOME; return here + '#' + code; }
 function showPair(){
   $('codeBig').textContent = code; $('codeMini').textContent = code; $('padUrl').textContent = padUrl().replace(/^https?:\/\//, '').replace(/#.*/, '');
   try { const qr = qrcode(0, 'M'); qr.addData(padUrl()); qr.make(); $('qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch (_) { $('qr').textContent = code; }
 }
-function setPhoneState(on){ $('phoneState').textContent = on ? 'Phone connected' : 'Waiting for a phone'; $('pair').classList.toggle('corner', on || Ctrl.mouse.used && mode !== 'pair'); }
+function setPhoneState(){
+  const n = phones().length;
+  $('phoneState').innerHTML = n === 0 ? 'Waiting for phones' : P.map(c => c.phone ? `<span style="color:${PCSS[c.i]}">Player ${c.i + 1}</span>` : '').filter(Boolean).join(' · ') + (n < 2 ? ' · scan to add player 2' : '');
+  $('pair').classList.toggle('corner', n > 0 || (Mouse.used && mode !== 'pair'));
+}
+function sayHi(){ if (link) link.send({ t: 'hi', game: mode === 'saber' || mode === 'blaster' ? mode : 'menu', slots: slots() }); }
+function playersChanged(){ setPhoneState(); sayHi(); if (mode === 'pair' && phones().length) toMenu(); }
 function startLink(){
   if (link) link.close();
-  link = ClayLink.host(code, m => { const was = Ctrl.phone; onPhone(m); if (!was && Ctrl.phone){ setPhoneState(true); toast('Phone connected. Point it at the screen and tap Center.'); if (link) link.send({ t: 'hi', game: mode === 'saber' || mode === 'blaster' ? mode : 'menu' }); if (mode === 'pair') toMenu(); } },
-    s => { if (s === 'taken'){ code = ClayLink.newCode(); showPair(); startLink(); } });
+  link = ClayLink.host(code, m => onPhone(m), s => { if (s === 'taken'){ code = ClayLink.newCode(); showPair(); startLink(); } });
 }
 showPair(); startLink();
+setInterval(sayHi, 2000);                                     // phones that joined late or missed a message still learn their colour
 $('soundBtn').addEventListener('click', () => { Snd.init(); $('soundBtn').textContent = 'Sound is on'; });
-$('mouseBtn').addEventListener('click', () => { Snd.init(); Ctrl.mouse.used = true; toMenu(); });
+$('mouseBtn').addEventListener('click', () => { Snd.init(); Mouse.used = true; toMenu(); });
 let toastT = 0; function toast(s){ $('toast').textContent = s; toastT = 3.2; }
 
-// ---------------------------------------------------------------- the pointer the menu and blaster share
-const reticle = new THREE.Group(); scene.add(reticle);
-(function(){ const m = new THREE.MeshBasicMaterial({ color: 0x5cf2cf, transparent: true, opacity: 0.95, depthTest: false });
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.075, 0.095, 40), m); reticle.add(ring);
-  for (let i = 0; i < 4; i++){ const t = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.07), m); const a = i * Math.PI / 2; t.position.set(Math.cos(a) * 0.15, Math.sin(a) * 0.15, 0); t.rotation.z = a + Math.PI / 2; reticle.add(t); }
-  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.018, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })); reticle.add(dot); reticle.renderOrder = 10; reticle.traverse(o => o.renderOrder = 10); })();
+// ---------------------------------------------------------------- crosshairs, one per player, in that player's colour
+function makeReticle(color){
+  const r = new THREE.Group(); scene.add(r);
+  const m = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthTest: false });
+  r.add(new THREE.Mesh(new THREE.RingGeometry(0.075, 0.095, 40), m));
+  for (let i = 0; i < 4; i++){ const t = new THREE.Mesh(new THREE.PlaneGeometry(0.02, 0.07), m); const a = i * Math.PI / 2; t.position.set(Math.cos(a) * 0.15, Math.sin(a) * 0.15, 0); t.rotation.z = a + Math.PI / 2; r.add(t); }
+  r.add(new THREE.Mesh(new THREE.CircleGeometry(0.018, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })));
+  r.traverse(o => o.renderOrder = 10); r.visible = false; return r;
+}
+const reticles = PCOL.map(makeReticle);
+const reticle = reticles[0];
 const ray = new THREE.Raycaster();
 const VIEW = { q: new Q() };      // the rail shooter turns the camera; aim is relative to where the camera looks
-function aimRay(){ ray.set(cam.position, _b.copy(Ctrl.dir).applyQuaternion(VIEW.q)); return ray; }
-function placeReticle(dist){ reticle.visible = true; reticle.position.copy(cam.position).addScaledVector(Ctrl.dir, dist); reticle.quaternion.copy(cam.quaternion); reticle.scale.setScalar(dist / 4); }
+function aimDir(c, out){ return out.copy(c.dir).applyQuaternion(VIEW.q); }
+function aimRay(c){ ray.set(cam.position, aimDir(c || P[0], _b)); return ray; }
+function placeReticle(c, dist){ const r = reticles[c.i]; r.visible = true; r.position.copy(cam.position).addScaledVector(aimDir(c, _ax), dist); r.quaternion.copy(cam.quaternion); r.scale.setScalar(clamp(dist / 4, 0.3, 2)); }
+function hideReticles(){ reticles.forEach(r => r.visible = false); }
 
 // ---------------------------------------------------------------- menu: two holo panels, point and pull the trigger
 let mode = 'pair';
@@ -278,128 +309,156 @@ function holo(title, sub, color, x){
   const m = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.5), new THREE.MeshBasicMaterial({ map: tex, transparent: true, fog: false })); m.position.set(x, 1.6, -4.2); m.rotation.y = -x * 0.12;
   m.userData = { draw, hi: false }; menu.add(m); return m;
 }
-const pSaber = holo('Saber', 'Swing through the orbs', '#5cf2cf', -1.45), pBlast = holo('Blaster Run', 'Ride the station, pop the targets', '#ff4fa8', 1.45);
+const pSaber = holo('Saber', 'Swing through the orbs', '#5cf2cf', -1.45), pBlast = holo('Blaster Run', 'Ride the station together', '#ff4fa8', 1.45);
 function menuFrame(dt){
-  const hits = aimRay().intersectObjects([pSaber, pBlast]);
-  const over = hits.length ? hits[0].object : null;
-  for (const p of [pSaber, pBlast]){ const hi = p === over; if (hi !== p.userData.hi){ p.userData.hi = hi; p.userData.draw(hi); if (hi) Snd.tick(); } p.scale.setScalar(p.scale.x + ((hi ? 1.06 : 1) - p.scale.x) * 0.2); }
-  placeReticle(hits.length ? hits[0].distance - 0.05 : 4);
-  if (takeFire() && over){ Snd.init(); Snd.pick(); startGame(over === pSaber ? 'saber' : 'blaster'); }
+  const lit = new Set(); let pick = null;
+  for (const c of players()){
+    const hits = aimRay(c).intersectObjects([pSaber, pBlast]); const over = hits.length ? hits[0].object : null;
+    if (over) lit.add(over); placeReticle(c, hits.length ? hits[0].distance - 0.05 : 4);
+    if (takeFire(c) && over) pick = over;
+  }
+  for (const p of [pSaber, pBlast]){ const hi = lit.has(p); if (hi !== p.userData.hi){ p.userData.hi = hi; p.userData.draw(hi); if (hi) Snd.tick(); } p.scale.setScalar(p.scale.x + ((hi ? 1.06 : 1) - p.scale.x) * 0.2); }
+  if (pick){ Snd.init(); Snd.pick(); startGame(pick === pSaber ? 'saber' : 'blaster'); }
 }
 function toMenu(){ stopGames(); mode = 'menu'; $('pair').classList.add('corner'); menu.visible = true; $('end').hidden = true; $('stats').hidden = true; $('gameName').innerHTML = 'Clay<b>house</b> Motion';
-  setPhoneState(Ctrl.phone); if (link) link.send({ t: 'hi', game: 'menu' }); takeFire(); }
+  setPhoneState(); sayHi(); takeFire(); }
 
-// ---------------------------------------------------------------- shared round state
-const R = { score: 0, combo: 0, best: 0, time: 60, hits: 0, shots: 0, on: false };
-function hudFrame(){ $('scoreV').textContent = R.score.toLocaleString(); $('comboV').textContent = R.combo;
-  if (mode === 'blaster'){ $('timeL').textContent = 'Area'; $('timeV').textContent = Blaster.area + ' / 4'; } else { $('timeL').textContent = 'Time'; $('timeV').textContent = Math.max(0, Math.ceil(R.time)); } }
-function award(base){ R.combo++; R.best = Math.max(R.best, R.combo); R.hits++; const mult = 1 + Math.min(4, Math.floor(R.combo / 8)); R.score += base * mult; if (link) link.send({ t: 'buzz', ms: 18 }); }
+// ---------------------------------------------------------------- shared round state: a score and combo for each player
+const R = { score: 0, combo: 0, best: 0, time: 60, hits: 0, shots: 0, on: false, ps: [0, 0], pc: [0, 0], pb: [0, 0], ph: [0, 0], duo: false };
+function hudFrame(){
+  R.duo = phones().length > 1;
+  $('s1V').textContent = R.ps[0].toLocaleString(); $('c1V').textContent = R.pc[0] > 1 ? '×' + R.pc[0] : '';
+  $('s2V').textContent = R.ps[1].toLocaleString(); $('c2V').textContent = R.pc[1] > 1 ? '×' + R.pc[1] : '';
+  $('p2stat').hidden = !R.duo; $('s1L').textContent = R.duo ? 'Player 1' : 'Score';
+  if (mode === 'blaster'){ $('timeL').textContent = 'Area'; $('timeV').textContent = Blaster.area + ' / 4'; } else { $('timeL').textContent = 'Time'; $('timeV').textContent = Math.max(0, Math.ceil(R.time)); }
+}
+function award(i, base){ R.pc[i]++; R.pb[i] = Math.max(R.pb[i], R.pc[i]); R.ph[i]++; R.hits++; const mult = 1 + Math.min(4, Math.floor(R.pc[i] / 8)); const pts = base * mult; R.ps[i] += pts; R.score += pts;
+  R.combo = Math.max(R.pc[0], R.pc[1]); R.best = Math.max(R.pb[0], R.pb[1]); const c = P[i]; if (link && c.pid) link.send({ t: 'buzz', pid: c.pid, ms: 18 }); }
+function breakCombo(i){ R.pc[i] = 0; R.combo = Math.max(R.pc[0], R.pc[1]); }
 function startGame(g){
   stopGames(); mode = g; menu.visible = false; $('end').hidden = true; $('stats').hidden = false; $('pair').classList.add('corner');
-  Object.assign(R, { score: 0, combo: 0, best: 0, time: 60, hits: 0, shots: 0, on: true });
+  Object.assign(R, { score: 0, combo: 0, best: 0, time: 60, hits: 0, shots: 0, on: true, ps: [0, 0], pc: [0, 0], pb: [0, 0], ph: [0, 0] });
   $('gameName').innerHTML = g === 'saber' ? 'Clay<b>house</b> Saber' : 'Clay<b>house</b> Blaster Run';
-  if (link) link.send({ t: 'hi', game: g });
+  sayHi();
   if (g === 'saber') Saber.start(); else Blaster.start();
   takeFire();
 }
-function stopGames(){ R.on = false; Saber.stop(); Blaster.stop(); reticle.visible = false; }
+function stopGames(){ R.on = false; Saber.stop(); Blaster.stop(); hideReticles(); }
 function endRound(){
   R.on = false; Snd.end(); Snd.humStop();
-  $('endTitle').textContent = mode === 'blaster' ? 'Run complete!' : 'Time!'; $('endScore').textContent = R.score.toLocaleString();
-  $('endNote').textContent = mode === 'saber' ? `${R.hits} orbs sliced, best combo ${R.best}` : `${R.hits} targets popped across four areas, best combo ${R.best}`;
+  const duo = R.duo || (R.ps[1] > 0);
+  $('endTitle').textContent = mode === 'blaster' ? 'Run complete!' : 'Time!';
+  $('endScore').textContent = R.score.toLocaleString();
+  const what = mode === 'saber' ? 'orbs sliced' : 'targets popped';
+  $('endNote').innerHTML = duo
+    ? `Team score. <span style="color:${PCSS[0]}">Player 1 ${R.ps[0].toLocaleString()}</span> (${R.ph[0]} ${what}, best combo ${R.pb[0]}) · <span style="color:${PCSS[1]}">Player 2 ${R.ps[1].toLocaleString()}</span> (${R.ph[1]} ${what}, best combo ${R.pb[1]})`
+    : `${R.hits} ${what}${mode === 'blaster' ? ' across four areas' : ''}, best combo ${R.best}`;
   $('end').hidden = false; takeFire();
 }
 $('againBtn').addEventListener('click', () => startGame(mode));
 $('menuBtn').addEventListener('click', toMenu);
 
 // ---------------------------------------------------------------- SABER: orbs fly in, swing the blade through them
+// Solo, one blade just right of center. With two phones, player 1 stands left and player 2 right; each player's orbs come in
+// their colour toward their side. Slicing your own colour scores a bonus, but any orb you hit counts.
 const Saber = (() => {
   const G = new THREE.Group(); G.visible = false; scene.add(G);
-  const PIVOT = new V3(0.12, 0.98, -1.25);                      // hand height, a little right of center, an arm's length out
   const LEN = 1.05;
-  const hilt = new THREE.Group(); G.add(hilt);
   const metal = new THREE.MeshStandardMaterial({ color: 0xb9c0d8, metalness: 0.9, roughness: 0.25 });
   const grip = new THREE.MeshStandardMaterial({ color: 0x1b1f33, metalness: 0.3, roughness: 0.6 });
-  const h1 = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.2, 18), grip); h1.position.y = -0.06; hilt.add(h1);
-  const h2 = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.022, 0.07, 18), metal); h2.position.y = 0.065; hilt.add(h2);
-  const h3 = new THREE.Mesh(new THREE.TorusGeometry(0.026, 0.006, 8, 20), metal); h3.rotation.x = Math.PI / 2; h3.position.y = -0.16; hilt.add(h3);
-  const core = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.014, LEN, 12), new THREE.MeshBasicMaterial({ color: 0xffffff })); core.position.y = 0.1 + LEN / 2; hilt.add(core);
-  const glowM = new THREE.MeshBasicMaterial({ color: 0x5cf2cf, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
-  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, LEN + 0.04, 16, 1, true), glowM); glow.position.y = 0.1 + LEN / 2; hilt.add(glow);
-  const glow2 = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.075, LEN + 0.08, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0x5cf2cf, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false })); glow2.position.y = 0.1 + LEN / 2; hilt.add(glow2);
-  const bladeLight = new THREE.PointLight(0x5cf2cf, 1.2, 3); bladeLight.position.y = 0.6; hilt.add(bladeLight);
-  // a fading ribbon of the blade's last positions: the swing trail
-  const NT = 14, trailPos = new Float32Array(NT * 2 * 3), trailA = new Float32Array(NT * 2);
-  const tGeo = new THREE.BufferGeometry(); tGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3)); tGeo.setAttribute('alpha', new THREE.BufferAttribute(trailA, 1));
-  const idx = []; for (let i = 0; i < NT - 1; i++){ const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } tGeo.setIndex(idx);
-  const tMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { col: { value: new THREE.Color(0x5cf2cf) } },
-    vertexShader: 'attribute float alpha; varying float va; void main(){ va = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: 'uniform vec3 col; varying float va; void main(){ gl_FragColor = vec4(col * va, va); }' });
-  const trail = new THREE.Mesh(tGeo, tMat); trail.frustumCulled = false; G.add(trail);
-  const hist = []; for (let i = 0; i < NT; i++) hist.push({ a: new V3(), b: new V3() });
-
+  const NT = 14;
+  function makeBlade(color){
+    const B = { hilt: new THREE.Group(), pivot: new V3(0.12, 0.98, -1.25), hist: [], base: new V3(), tip: new V3() };
+    const hilt = B.hilt; G.add(hilt);
+    const h1 = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.024, 0.2, 18), grip); h1.position.y = -0.06; hilt.add(h1);
+    const h2 = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.022, 0.07, 18), metal); h2.position.y = 0.065; hilt.add(h2);
+    const h3 = new THREE.Mesh(new THREE.TorusGeometry(0.026, 0.006, 8, 20), metal); h3.rotation.x = Math.PI / 2; h3.position.y = -0.16; hilt.add(h3);
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.014, LEN, 12), new THREE.MeshBasicMaterial({ color: 0xffffff })); core.position.y = 0.1 + LEN / 2; hilt.add(core);
+    B.glowM = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
+    const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, LEN + 0.04, 16, 1, true), B.glowM); glow.position.y = 0.1 + LEN / 2; hilt.add(glow);
+    const glow2 = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.075, LEN + 0.08, 16, 1, true), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false })); glow2.position.y = 0.1 + LEN / 2; hilt.add(glow2);
+    const bl = new THREE.PointLight(color, 1.0, 3); bl.position.y = 0.6; hilt.add(bl);
+    // a fading ribbon of the blade's last positions: the swing trail
+    B.trailPos = new Float32Array(NT * 2 * 3); B.trailA = new Float32Array(NT * 2);
+    const tGeo = B.tGeo = new THREE.BufferGeometry(); tGeo.setAttribute('position', new THREE.BufferAttribute(B.trailPos, 3)); tGeo.setAttribute('alpha', new THREE.BufferAttribute(B.trailA, 1));
+    const idx = []; for (let i = 0; i < NT - 1; i++){ const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } tGeo.setIndex(idx);
+    const tMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { col: { value: new THREE.Color(color) } },
+      vertexShader: 'attribute float alpha; varying float va; void main(){ va = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'uniform vec3 col; varying float va; void main(){ gl_FragColor = vec4(col * va, va); }' });
+    B.trail = new THREE.Mesh(tGeo, tMat); B.trail.frustumCulled = false; G.add(B.trail);
+    for (let i = 0; i < NT; i++) B.hist.push({ a: new V3(0, -9, 0), b: new V3(0, -9, 0) });
+    return B;
+  }
+  const blades = PCOL.map(makeBlade);
   const orbs = [], halves = [];
-  const ORB_R = 0.12, COLORS = [0x5cf2cf, 0xff4fa8];
+  const ORB_R = 0.12;
   const orbGeo = new THREE.SphereGeometry(ORB_R, 28, 20);
   const halfGeo = new THREE.SphereGeometry(ORB_R, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
   const capGeo = new THREE.CircleGeometry(ORB_R, 24);
-  const orbMats = COLORS.map(c => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.55, roughness: 0.25, metalness: 0.1 }));
+  const orbMats = PCOL.map(c => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.55, roughness: 0.25, metalness: 0.1 }));
   const capMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-  const haloMats = COLORS.map(c => new THREE.SpriteMaterial({ map: glowTex, color: c, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
+  const haloMats = PCOL.map(c => new THREE.SpriteMaterial({ map: glowTex, color: c, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
   let spawnT = 0, t = 0, lastWhoosh = 0;
-  const tip = new V3(), base = new V3(), segA = new V3(), segB = new V3(), cp = new V3(), tmp = new V3();
-  function spawn(){
-    const ci = Math.random() < 0.5 ? 0 : 1, m = new THREE.Mesh(orbGeo, orbMats[ci]);
-    const halo = new THREE.Sprite(haloMats[ci]); halo.scale.setScalar(0.55); m.add(halo);
-    // aim each orb at a point the blade can reach, then start it far down the room
+  const segA = new V3(), cp = new V3(), tmp = new V3(), line = new THREE.Line3();
+  function layout(){ const pl = players(); if (pl.length > 1){ blades[0].pivot.set(-0.45, 0.98, -1.25); blades[1].pivot.set(0.45, 0.98, -1.25); } else blades[pl[0].i].pivot.set(0.12, 0.98, -1.25); return pl; }
+  function spawn(owner){
+    const B = blades[owner], m = new THREE.Mesh(orbGeo, orbMats[owner]);
+    const halo = new THREE.Sprite(haloMats[owner]); halo.scale.setScalar(0.55); m.add(halo);
+    // aim each orb at a point the owner's blade can reach, then start it far down the room
     const ang = (Math.random() * 1.6 - 0.8), up = Math.random() * 0.9 - 0.15, r = 0.55 + Math.random() * 0.35;
-    const goal = new V3(PIVOT.x + Math.sin(ang) * r, PIVOT.y + 0.25 + up * 0.6, PIVOT.z - 0.35);
+    const goal = new V3(B.pivot.x + Math.sin(ang) * r, B.pivot.y + 0.25 + up * 0.6, B.pivot.z - 0.35);
     const start = new V3(goal.x * 1.6 + (Math.random() - 0.5) * 1.2, goal.y + (Math.random() - 0.3) * 1.2, -16);
     const speed = 4.2 + Math.min(3, t / 20);
-    m.position.copy(start); m.userData = { ci, vel: goal.clone().sub(start).normalize().multiplyScalar(speed), spin: new V3(Math.random(), Math.random(), Math.random()).multiplyScalar(2), live: true };
+    m.position.copy(start); m.userData = { owner, vel: goal.clone().sub(start).normalize().multiplyScalar(speed), spin: new V3(Math.random(), Math.random(), Math.random()).multiplyScalar(2), live: true };
     G.add(m); orbs.push(m);
   }
-  function slice(o, normal){
-    const p = o.position.clone(), col = COLORS[o.userData.ci];
+  function slice(o, normal, by){
+    const p = o.position.clone(), col = PCOL[o.userData.owner];
     for (const s of [-1, 1]){
-      const h = new THREE.Group(); const sh = new THREE.Mesh(halfGeo, orbMats[o.userData.ci]); h.add(sh); const cap = new THREE.Mesh(capGeo, capMat); cap.rotation.x = Math.PI / 2; h.add(cap);
+      const h = new THREE.Group(); const sh = new THREE.Mesh(halfGeo, orbMats[o.userData.owner]); h.add(sh); const cap = new THREE.Mesh(capGeo, capMat); cap.rotation.x = Math.PI / 2; h.add(cap);
       h.position.copy(p); h.quaternion.setFromUnitVectors(new V3(0, 1, 0), normal.clone().multiplyScalar(s));
       h.userData = { vel: o.userData.vel.clone().multiplyScalar(0.25).addScaledVector(normal, s * 2.2).add(new V3(0, 0.8, 0)), spin: new V3(Math.random() * 6 - 3, Math.random() * 6 - 3, Math.random() * 6 - 3), life: 1.1 };
       G.add(h); halves.push(h);
     }
-    burst(p, col, 34, 3.2); Snd.slice(); award(100);
+    burst(p, col, 34, 3.2); Snd.slice(); award(by, o.userData.owner === by ? 120 : 100);
     G.remove(o); o.userData.live = false;
   }
   return {
-    start(){ G.visible = true; t = 0; spawnT = 0.6; hist.forEach(h => { h.a.set(0, -9, 0); h.b.set(0, -9, 0); }); Snd.humStart(); },
+    start(){ G.visible = true; t = 0; spawnT = 0.6; blades.forEach(B => B.hist.forEach(h => { h.a.set(0, -9, 0); h.b.set(0, -9, 0); })); Snd.humStart(); },
     stop(){ G.visible = false; orbs.splice(0).forEach(o => G.remove(o)); halves.splice(0).forEach(h => G.remove(h)); Snd.humStop(); },
     frame(dt){
       t += dt;
-      // the blade: from the hand, along the phone's pointing direction
-      hilt.position.copy(PIVOT); hilt.quaternion.setFromUnitVectors(new V3(0, 1, 0), Ctrl.dir);
-      base.copy(PIVOT).addScaledVector(Ctrl.dir, 0.1); tip.copy(PIVOT).addScaledVector(Ctrl.dir, 0.1 + LEN);
-      const sp = Ctrl.speed; Snd.humSet(sp); glowM.opacity = 0.32 + Math.min(0.3, sp * 0.03);
-      if (sp > 5 && t - lastWhoosh > 0.25){ lastWhoosh = t; Snd.whoosh(Math.min(1, sp / 12)); }
-      // trail
-      hist.pop(); hist.unshift({ a: base.clone(), b: tip.clone() });
-      for (let i = 0; i < NT; i++){ const h = hist[i]; trailPos.set([h.a.x, h.a.y, h.a.z], i * 6); trailPos.set([h.b.x, h.b.y, h.b.z], i * 6 + 3); const a = (1 - i / NT) * Math.min(1, sp / 8) * 0.3; trailA[i * 2] = a * 0.3; trailA[i * 2 + 1] = a; }
-      tGeo.attributes.position.needsUpdate = true; tGeo.attributes.alpha.needsUpdate = true;
+      const pl = layout(); let top = 0;
+      blades.forEach((B, i) => { const on = pl.some(c => c.i === i); B.hilt.visible = on; B.trail.visible = on; });
+      // each blade: from its hand, along that phone's pointing direction
+      for (const c of pl){
+        const B = blades[c.i];
+        B.hilt.position.copy(B.pivot); B.hilt.quaternion.setFromUnitVectors(new V3(0, 1, 0), c.dir);
+        B.base.copy(B.pivot).addScaledVector(c.dir, 0.1); B.tip.copy(B.pivot).addScaledVector(c.dir, 0.1 + LEN);
+        const sp = c.speed; top = Math.max(top, sp); B.glowM.opacity = 0.32 + Math.min(0.3, sp * 0.03);
+        B.hist.pop(); B.hist.unshift({ a: B.base.clone(), b: B.tip.clone() });
+        for (let i = 0; i < NT; i++){ const h = B.hist[i]; B.trailPos.set([h.a.x, h.a.y, h.a.z], i * 6); B.trailPos.set([h.b.x, h.b.y, h.b.z], i * 6 + 3); const a = (1 - i / NT) * Math.min(1, sp / 8) * 0.3; B.trailA[i * 2] = a * 0.3; B.trailA[i * 2 + 1] = a; }
+        B.tGeo.attributes.position.needsUpdate = true; B.tGeo.attributes.alpha.needsUpdate = true;
+      }
+      Snd.humSet(top); if (top > 5 && t - lastWhoosh > 0.25){ lastWhoosh = t; Snd.whoosh(Math.min(1, top / 12)); }
       if (!R.on) return;
       R.time -= dt; if (R.time <= 0){ R.time = 0; endRound(); }
-      spawnT -= dt; if (spawnT <= 0){ spawn(); if (Math.random() < Math.min(0.45, t / 90)) spawn(); spawnT = Math.max(0.42, 1.0 - t / 70); }
+      spawnT -= dt;
+      if (spawnT <= 0){ const per = pl.length > 1 ? 0.75 : 1; for (const c of pl){ spawn(c.i); if (Math.random() < Math.min(0.45, t / 90) * per) spawn(c.i); } spawnT = Math.max(0.42, 1.0 - t / 70) * (pl.length > 1 ? 1.25 : 1); }
       for (let i = orbs.length - 1; i >= 0; i--){
         const o = orbs[i], u = o.userData; if (!u.live){ orbs.splice(i, 1); continue; }
         o.position.addScaledVector(u.vel, dt); o.rotation.x += u.spin.x * dt; o.rotation.y += u.spin.y * dt;
-        // swept test: the blade from its last pose to this one, against the orb
-        segA.copy(base); segB.copy(tip);
-        const prev = hist[1];
-        let d = new THREE.Line3(segA, segB).closestPointToPoint(o.position, true, cp).distanceTo(o.position);
-        if (prev && prev.a.y > -5){ const mid = tmp.copy(prev.b).lerp(tip, 0.5); d = Math.min(d, new THREE.Line3(segA, mid).closestPointToPoint(o.position, true, cp).distanceTo(o.position)); }
-        if (d < ORB_R + 0.05 && sp > 2.0){
-          const n = tmp.crossVectors(Ctrl.dir, Ctrl.omega.lengthSq() > 1e-4 ? Ctrl.omega : new V3(0, 0, 1)).normalize(); if (!isFinite(n.x)) n.set(1, 0, 0);
-          slice(o, n.clone()); orbs.splice(i, 1); continue;
+        let cut = false;
+        for (const c of pl){
+          const B = blades[c.i]; if (c.speed <= 2.0) continue;
+          // swept test: the blade from its last pose to this one, against the orb
+          line.set(B.base, B.tip); let d = line.closestPointToPoint(o.position, true, cp).distanceTo(o.position);
+          const prev = B.hist[1]; if (prev && prev.a.y > -5){ line.set(B.base, tmp.copy(prev.b).lerp(B.tip, 0.5)); d = Math.min(d, line.closestPointToPoint(o.position, true, cp).distanceTo(o.position)); }
+          if (d < ORB_R + 0.05){ const n = tmp.crossVectors(c.dir, c.omega.lengthSq() > 1e-4 ? c.omega : new V3(0, 0, 1)).normalize(); if (!isFinite(n.x)) n.set(1, 0, 0);
+            slice(o, n.clone(), c.i); cut = true; break; }
         }
-        if (o.position.z > PIVOT.z + 0.9){ G.remove(o); orbs.splice(i, 1); R.combo = 0; }           // a miss just ends the combo, no penalty
+        if (cut){ orbs.splice(i, 1); continue; }
+        if (o.position.z > -0.35){ G.remove(o); orbs.splice(i, 1); breakCombo(u.owner); }           // a miss just ends that player's combo, no penalty
       }
       for (let i = halves.length - 1; i >= 0; i--){ const h = halves[i], u = h.userData; u.life -= dt; u.vel.y -= 6 * dt; h.position.addScaledVector(u.vel, dt);
         h.rotation.x += u.spin.x * dt; h.rotation.y += u.spin.y * dt; h.scale.setScalar(Math.max(0.01, Math.min(1, u.life * 2))); if (u.life <= 0){ G.remove(h); halves.splice(i, 1); } }
@@ -492,17 +551,21 @@ const Blaster = (() => {
     { spots: [[6, 4.6], [7.1, 4.3], [6.3, 3.1], [7.2, 2.6], [6.8, 4.9]], n: 8, label: 'Lift shaft' },
     { spots: [[5.5, 1.5], [7, 1.2], [8.5, 1.4], [9.8, 2], [9, 2.8], [6.1, 2.6], [10, 1.2]], n: 11, label: 'Observation deck' }];
 
-  // the toy blaster, held low right; it rides with the camera
-  const gun = new THREE.Group(); G.add(gun);
-  const body = new THREE.MeshStandardMaterial({ color: 0xff7a2e, emissive: 0xff5a10, emissiveIntensity: 0.45, roughness: 0.35, metalness: 0.1 }), trim = new THREE.MeshStandardMaterial({ color: 0x2a2f55, emissive: 0x141833, roughness: 0.5 }), glowC = new THREE.MeshBasicMaterial({ color: 0x5cf2cf });
-  gun.scale.setScalar(0.8);
-  const gb = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.1, 0.32), body); gun.add(gb);
-  const g2 = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.034, 0.22, 16), trim); g2.rotation.x = Math.PI / 2; g2.position.set(0, 0.015, -0.24); gun.add(g2);
-  const g3 = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.009, 8, 20), glowC); g3.position.set(0, 0.015, -0.35); gun.add(g3);
-  const g4 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.07), trim); g4.position.set(0, -0.1, 0.07); g4.rotation.x = 0.35; gun.add(g4);
-  const g5 = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.02, 0.24), glowC); g5.position.set(0, 0.06, -0.02); gun.add(g5);
+  // a toy blaster for each player, held low (solo: right; duo: player 1 left, player 2 right), riding with the camera
+  const trim = new THREE.MeshStandardMaterial({ color: 0x2a2f55, emissive: 0x141833, roughness: 0.5 });
+  function makeGun(accent){
+    const gun = new THREE.Group(); G.add(gun); gun.scale.setScalar(0.8);
+    const body = new THREE.MeshStandardMaterial({ color: 0xff7a2e, emissive: 0xff5a10, emissiveIntensity: 0.45, roughness: 0.35, metalness: 0.1 }), glowC = new THREE.MeshBasicMaterial({ color: accent });
+    gun.add(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.1, 0.32), body));
+    const g2 = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.034, 0.22, 16), trim); g2.rotation.x = Math.PI / 2; g2.position.set(0, 0.015, -0.24); gun.add(g2);
+    const g3 = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.009, 8, 20), glowC); g3.position.set(0, 0.015, -0.35); gun.add(g3);
+    const g4 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.07), trim); g4.position.set(0, -0.1, 0.07); g4.rotation.x = 0.35; gun.add(g4);
+    const g5 = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.02, 0.24), glowC); g5.position.set(0, 0.06, -0.02); gun.add(g5);
+    gun.userData = { cool: 0, bolt: new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }) };
+    return gun;
+  }
+  const guns = PCOL.map(makeGun);
   const MUZ = new V3(0, 0.015, -0.37), GUNOFF = new V3(0.34, -0.36, -1.05);
-  const boltMat = new THREE.MeshBasicMaterial({ color: 0xff4fa8, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
   const bolts = [];
   // targets: bullseye boards that slide out, and hover pods that drop from the ceiling
   const tex = (() => { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'); const cols = ['#ff4fa8', '#ffffff', '#5cf2cf', '#ffffff', '#ffb84d'];
@@ -524,23 +587,22 @@ const Blaster = (() => {
       g.position.set(p.x, HGT + 0.3, p.z); g.userData = { kind: 'pod', hit: m, y: 1.3 + Math.random() * 1.6, rise: 0, ph: Math.random() * 6, pts: 200, life: 7 + Math.random() * 3, x0: p.x }; }
     G.add(g); targets.push(g);
   }
-  function aimDirWorld(out){ return out.copy(Ctrl.dir).applyQuaternion(VIEW.q); }
-  function shoot(){
-    R.shots++; Snd.pew(); cool = 0.16;
-    const from = gun.localToWorld(MUZ.clone()), dir = aimDirWorld(new V3());
+  function shoot(c){
+    const gun = guns[c.i]; R.shots++; Snd.pew(); gun.userData.cool = 0.16;
+    const from = gun.localToWorld(MUZ.clone()), dir = aimDir(c, new V3());
     ray.set(cam.position, dir);
     const hits = ray.intersectObjects(targets.map(g => g.userData.hit), false);
     const wall = ray.intersectObject(level, true);
     const to = hits.length ? hits[0].point : wall.length ? wall[0].point : cam.position.clone().addScaledVector(dir, 20);
-    const len = from.distanceTo(to), bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, len, 6, 1, true), boltMat);
+    const len = from.distanceTo(to), bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, len, 6, 1, true), gun.userData.bolt.clone());
     bolt.position.copy(from).lerp(to, 0.5); bolt.quaternion.setFromUnitVectors(new V3(0, 1, 0), to.clone().sub(from).normalize()); bolt.userData = { life: 0.09 }; G.add(bolt); bolts.push(bolt);
     if (hits.length && (!wall.length || hits[0].distance <= wall[0].distance + 0.05)){
       const g = targets.find(x => x.userData.hit === hits[0].object); if (!g) return;
       let pts = g.userData.pts;
       if (g.userData.kind === 'board'){ const local = g.worldToLocal(hits[0].point.clone()); const r = Math.hypot(local.x, local.y); if (r < 0.08) pts += 200; else if (r < 0.17) pts += 80; }
-      burst(hits[0].point, g.userData.kind === 'board' ? 0xff4fa8 : 0x5cf2cf, 40, 3.5); Snd.pop(); award(pts);
+      burst(hits[0].point, PCOL[c.i], 40, 3.5); Snd.pop(); award(c.i, pts);
       G.remove(g); targets.splice(targets.indexOf(g), 1); if (wave) wave.cleared++;
-    } else { R.combo = 0; if (wall.length) burst(wall[0].point, 0xffffff, 6, 1.2); }
+    } else { breakCombo(c.i); if (wall.length) burst(wall[0].point, 0xffffff, 6, 1.2); }
   }
   function startWave(i){ const w = WAVES[i]; wave = { i, left: w.n, cleared: 0, t: 0, next: 0.4, w }; state = 'wave'; banner = 2; toast(w.label); }
   return {
@@ -562,15 +624,20 @@ const Blaster = (() => {
       lookAt.lerp(lookGoal, 1 - Math.exp(-dt * 2.6));
       cam.position.copy(camPos).add(tmp.set(Math.sin(t * 0.9) * 0.015, Math.sin(t * 1.7) * 0.01, 0)); cam.lookAt(lookAt);
       VIEW.q.copy(cam.quaternion);
-      // the blaster follows the camera and points where you aim
-      gun.position.copy(GUNOFF).applyQuaternion(cam.quaternion).add(cam.position);
-      gun.quaternion.setFromUnitVectors(new V3(0, 0, -1), aimDirWorld(tmp)); gun.position.addScaledVector(aimDirWorld(tmp), Math.min(0, -cool * 0.25));
-      ray.set(cam.position, aimDirWorld(tmp)); const ah = ray.intersectObjects(targets.map(g => g.userData.hit), false), aw = ray.intersectObject(level, true);
-      const d = Math.min(ah.length ? ah[0].distance : 99, aw.length ? aw[0].distance : 99, 12) - 0.05;
-      reticle.visible = true; reticle.position.copy(cam.position).addScaledVector(tmp, d); reticle.quaternion.copy(cam.quaternion); reticle.scale.setScalar(clamp(d / 4, 0.3, 2));
-      for (let i = bolts.length - 1; i >= 0; i--){ const b = bolts[i]; b.userData.life -= dt; b.material.opacity = Math.max(0, b.userData.life / 0.09); if (b.userData.life <= 0){ G.remove(b); bolts.splice(i, 1); } }
+      // each blaster follows the camera and points where its player aims; each player has a crosshair
+      const pl = players(), duo = pl.length > 1; hideReticles();
+      guns.forEach((g, i) => g.visible = pl.some(c => c.i === i));
+      for (const c of pl){
+        const gun = guns[c.i]; gun.userData.cool -= dt;
+        tmp.copy(GUNOFF); if (duo && c.i === 0) tmp.x = -tmp.x;
+        gun.position.copy(tmp).applyQuaternion(cam.quaternion).add(cam.position);
+        aimDir(c, tmp); gun.quaternion.setFromUnitVectors(new V3(0, 0, -1), tmp); gun.position.addScaledVector(tmp, Math.min(0, -gun.userData.cool * 0.25));
+        ray.set(cam.position, tmp); const ah = ray.intersectObjects(targets.map(g => g.userData.hit), false), aw = ray.intersectObject(level, true);
+        placeReticle(c, Math.min(ah.length ? ah[0].distance : 99, aw.length ? aw[0].distance : 99, 12) - 0.05);
+      }
+      for (let i = bolts.length - 1; i >= 0; i--){ const b = bolts[i]; b.userData.life -= dt; b.material.opacity = Math.max(0, b.userData.life / 0.09); if (b.userData.life <= 0){ G.remove(b); b.geometry.dispose(); b.material.dispose(); bolts.splice(i, 1); } }
       if (!R.on){ takeFire(); return; }
-      const shots = takeFire(); if (shots) shoot(); else if (Ctrl.held && cool <= 0 && Ctrl.phone) shoot();
+      for (const c of pl){ if (takeFire(c)) shoot(c); else if (c.held && guns[c.i].userData.cool <= 0 && c.phone) shoot(c); }
       if (state === 'wave'){
         wave.t += dt; wave.next -= dt;
         if (wave.left > 0 && wave.next <= 0 && targets.length < 5){ const sp = wave.w.spots[(Math.random() * wave.w.spots.length) | 0]; spawn(sp); wave.left--; wave.next = 0.55 + Math.random() * 0.6; }
@@ -590,22 +657,22 @@ const Blaster = (() => {
 
 // ---------------------------------------------------------------- main loop
 let lastT = performance.now();
-menu.visible = false; reticle.visible = false;
+menu.visible = false; hideReticles();
 function loop(){
   requestAnimationFrame(loop);
   const now = performance.now(), dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
   ctrlFrame(dt);
   if (mode === 'menu') menuFrame(dt);
-  else if (mode === 'saber'){ reticle.visible = false; Saber.frame(dt); hudFrame(); }
+  else if (mode === 'saber'){ hideReticles(); Saber.frame(dt); hudFrame(); }
   else if (mode === 'blaster'){ Blaster.frame(dt); hudFrame(); }
-  else { reticle.visible = false; }
+  else { hideReticles(); }
   sparkFrame(dt);
   if (mode !== 'blaster'){ const sway = Math.sin(now / 2400) * 0.02; cam.position.set(EYE.x + sway, EYE.y + Math.sin(now / 1700) * 0.008, EYE.z); cam.lookAt(sway * 0.5, 1.45, -5); }
   if (toastT > 0){ toastT -= dt; if (toastT <= 0) $('toast').textContent = ''; }
   renderer.render(scene, cam);
 }
 loop();
-window.__motion = { Ctrl, R, onPhone, VIEW, Blaster, cam, startGame, toMenu, tick(n, dt){ for (let i = 0; i < n; i++){ scene.updateMatrixWorld(); ctrlFrame(dt); if (mode === 'saber') Saber.frame(dt); else if (mode === 'blaster') Blaster.frame(dt); else if (mode === 'menu') menuFrame(dt); sparkFrame(dt); } }, get mode(){ return mode; }, code: () => code };
+window.__motion = { Ctrl, P, Mouse, R, onPhone, VIEW, Blaster, cam, startGame, toMenu, tick(n, dt){ for (let i = 0; i < n; i++){ scene.updateMatrixWorld(); ctrlFrame(dt); if (mode === 'saber') Saber.frame(dt); else if (mode === 'blaster') Blaster.frame(dt); else if (mode === 'menu') menuFrame(dt); sparkFrame(dt); } }, get mode(){ return mode; }, code: () => code };
 })();
 </script>
 </body></html>
