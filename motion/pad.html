@@ -41,7 +41,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 .err{ color:var(--amber); font-size:14px; margin:0 }
 </style>
 </head><body>
-<header><div class="brand">Clay<b>house</b></div><div id="pill" class="pill">Not connected</div></header>
+<header><div class="brand">Clay<b>house</b></div><div id="pill" class="pill">Not connected</div></header><p class="tip" style="margin:0;font-size:12px">Build 3</p><header hidden></header>
 
 <section id="join">
   <h1>Turn this phone into the controller</h1>
@@ -60,8 +60,8 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 </section>
 
 <script src="lib/peerjs.min.js"></script>
-<script src="lib/mqtt.min.js"></script>
-<script src="link.js?v=2"></script>
+<script src="lib/mqtt.min.js?v=3"></script>
+<script src="link.js?v=3"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
