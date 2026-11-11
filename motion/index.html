@@ -79,6 +79,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 
 <script src="lib/three.min.js"></script>
 <script src="lib/peerjs.min.js"></script>
+<script src="lib/mqtt.min.js"></script>
 <script src="lib/qrcode.js"></script>
 <script src="link.js"></script>
 <script>
@@ -244,7 +245,7 @@ function setPhoneState(on){ $('phoneState').textContent = on ? 'Phone connected'
 function startLink(){
   if (link) link.close();
   link = ClayLink.host(code, m => { const was = Ctrl.phone; onPhone(m); if (!was && Ctrl.phone){ setPhoneState(true); toast('Phone connected. Point it at the screen and tap Center.'); if (link) link.send({ t: 'hi', game: mode === 'saber' || mode === 'blaster' ? mode : 'menu' }); if (mode === 'pair') toMenu(); } },
-    s => { if (s === 'taken'){ code = ClayLink.newCode(); showPair(); startLink(); } if (s === 'offline') toast('No internet, so phones cannot join. The mouse still works.'); if (s === 'lost'){ setPhoneState(false); } });
+    s => { if (s === 'taken'){ code = ClayLink.newCode(); showPair(); startLink(); } });
 }
 showPair(); startLink();
 $('soundBtn').addEventListener('click', () => { Snd.init(); $('soundBtn').textContent = 'Sound is on'; });

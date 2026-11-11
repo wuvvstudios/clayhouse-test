@@ -60,6 +60,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 </section>
 
 <script src="lib/peerjs.min.js"></script>
+<script src="lib/mqtt.min.js"></script>
 <script src="link.js"></script>
 <script>
 (() => {
@@ -107,11 +108,11 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
     if (d.t === 'buzz' && navigator.vibrate) { try { navigator.vibrate(Math.min(80, d.ms || 20)); } catch (_) {} }
   }
   function onStatus(s){
-    if (s === 'connected') status('Connected', 'ok');
-    else if (s === 'connecting') status('Connecting');
+    if (s === 'direct') status('Connected', 'ok');
+    else if (s === 'relay') status('Connected (relay)', 'ok');
+    else if (s === 'server') status('Reaching server');
+    else if (s === 'screen') status('Finding screen');
     else if (s === 'nohost') status('Screen not found', 'warn');
-    else if (s === 'lost') status('Reconnecting', 'warn');
-    else if (s === 'offline') status('No internet', 'warn');
   }
 
   $('go').addEventListener('click', async () => {
