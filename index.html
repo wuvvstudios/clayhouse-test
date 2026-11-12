@@ -3488,19 +3488,20 @@ html body .moves b{color:var(--vt-red)}
       <div style="position:absolute;left:calc(50% + ${w * 0.18}px);top:${w * 0.05}px;width:${w * 0.06}px;height:${w * 0.06}px;border-radius:50%;background:#26304a;box-shadow:inset 0 0 0 2px #0a0a0e"></div></div>`; };
   const PDEPTH = 120;
   const phoneBoxHTML = (g, i) => {
-    const edge = shade(g.color, 0.62), deep = shade(g.color, 0.48), ts = g.title.length > 10 ? 28 : 36;
+    // clean white retail box, deliberately not vintage: the only color is the game glowing on the phone
+    const W = '#FBFBF9', SIDE = 'linear-gradient(90deg,#ECECE8,#F7F7F4)', SANS = "-apple-system,'Helvetica Neue','Segoe UI',Arial,sans-serif", ts = g.title.length > 10 ? 30 : 38;
+    const face = 'position:absolute;box-sizing:border-box;border:1px solid #DAD9D3;overflow:hidden';
     return `<button class="pack phonebox" type="button" data-hand data-vh="${i}" aria-label="${esc(g.title)}">
       <div class="lift">
-        <div aria-hidden="true" style="position:absolute;inset:0;border-radius:18px;background:${deep};transform:translateZ(-${PDEPTH}px)"></div>
-        <div class="cb-face" aria-hidden="true" style="right:-${PDEPTH}px;top:0;width:${PDEPTH}px;height:100%;border-radius:4px;transform-origin:0 50%;transform:rotateY(90deg);background:linear-gradient(90deg,${edge},${deep})">
-          <div style="position:absolute;inset:14px 12px;border:2px solid rgba(243,230,200,.45);border-radius:8px;display:flex;align-items:center;justify-content:center">
-            <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-family:'Bungee',sans-serif;font-size:26px;letter-spacing:3px;background:linear-gradient(180deg,#fff1b8,#d9a52e 45%,#fff1b8 55%,#b9861d);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(1px 1px 0 #1B1B1B);white-space:nowrap">${esc(g.title)}</div></div>
-          <div style="position:absolute;left:0;right:0;bottom:22px;text-align:center;font-family:'Bungee',sans-serif;font-size:10px;letter-spacing:2px;color:#F3E6C8">PHONE CONTROLLER</div><div class="wear" style="opacity:.7"></div></div>
-        <div class="cb-face" aria-hidden="true" style="left:0;top:-${PDEPTH}px;width:100%;height:${PDEPTH}px;transform-origin:50% 100%;transform:rotateX(90deg);background:linear-gradient(180deg,${deep},${edge})"><div class="wear" style="opacity:.6"></div></div>
-        <div class="cb-face" aria-hidden="true" style="left:0;bottom:-${PDEPTH}px;width:100%;height:${PDEPTH}px;transform-origin:50% 0;transform:rotateX(-90deg);background:${deep}"></div>
-        <div class="pack-body" style="background:radial-gradient(ellipse at 50% 40%,#2b2b33,#121216 75%);border-radius:18px;filter:none;transform:translateZ(-60px)">
-          <div aria-hidden="true" style="position:absolute;left:70px;top:46px;width:220px;height:420px;border-radius:44px;background:#0b0b0e;box-shadow:inset 0 10px 24px rgba(0,0,0,.8),0 0 0 3px rgba(255,255,255,.05)"></div>
-          <div style="position:absolute;left:0;right:0;bottom:12px;text-align:center;font-family:'Bungee',sans-serif;font-size:11px;letter-spacing:3px;color:rgba(243,230,200,.55)">LIFT TO PLAY</div>
+        <div aria-hidden="true" style="position:absolute;inset:0;border-radius:16px;background:#E4E3DE;transform:translateZ(-${PDEPTH}px)"></div>
+        <div aria-hidden="true" style="${face};right:-${PDEPTH}px;top:0;width:${PDEPTH}px;height:100%;border-radius:3px;transform-origin:0 50%;transform:rotateY(90deg);background:${SIDE}">
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="writing-mode:vertical-rl;transform:rotate(180deg);font-family:${SANS};font-size:24px;font-weight:600;letter-spacing:6px;color:#2A2A2E;white-space:nowrap">${esc(g.title)}</div></div>
+          <div style="position:absolute;left:0;right:0;bottom:24px;text-align:center;font-family:${SANS};font-size:9px;font-weight:600;letter-spacing:3px;color:#9A9993">CLAYHOUSE</div></div>
+        <div aria-hidden="true" style="${face};left:0;top:-${PDEPTH}px;width:100%;height:${PDEPTH}px;transform-origin:50% 100%;transform:rotateX(90deg);background:linear-gradient(180deg,#F2F2EE,${W})"></div>
+        <div aria-hidden="true" style="${face};left:0;bottom:-${PDEPTH}px;width:100%;height:${PDEPTH}px;transform-origin:50% 0;transform:rotateX(-90deg);background:#E9E8E3"></div>
+        <div class="pack-body" style="background:radial-gradient(ellipse at 50% 40%,#FFFFFF,#ECEBE6 80%);border-radius:16px;filter:none;box-shadow:inset 0 0 0 1px #DAD9D3;transform:translateZ(-60px)">
+          <div aria-hidden="true" style="position:absolute;left:70px;top:46px;width:220px;height:420px;border-radius:44px;background:#E6E5E0;box-shadow:inset 0 8px 20px rgba(0,0,0,.18)"></div>
+          <div style="position:absolute;left:0;right:0;bottom:14px;text-align:center;font-family:${SANS};font-size:10px;font-weight:600;letter-spacing:4px;color:#A5A49E">LIFT TO PLAY</div>
         </div>
         <div class="bub" style="left:70px;top:46px;width:220px;height:420px">
           <div class="fig" aria-hidden="true" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:translateZ(-46px);pointer-events:none;transition:transform .6s cubic-bezier(.2,.8,.2,1),opacity .4s ease">${phoneArt(g, 190)}</div>
@@ -3508,14 +3509,12 @@ html body .moves b{color:var(--vt-red)}
             <div style="position:absolute;left:0;right:0;bottom:24px;display:flex;justify-content:center"><span style="background:#1B1B1B;border:2px solid #F3E6C8;color:#F3E6C8;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:800;letter-spacing:2px">GRAB YOUR PHONE</span></div></div></div>
           <div class="burst" aria-hidden="true" style="position:absolute;inset:0;transform:translateZ(44px);pointer-events:none" hidden></div>
         </div>
-        <div class="bub-front phonelid cb-face" aria-hidden="true" style="left:0;top:0;width:100%;height:100%;border-radius:18px;border-width:4px;background:radial-gradient(ellipse at 50% 38%,rgba(255,244,218,.22),rgba(0,0,0,0) 60%),${g.color}">
-          <div style="position:absolute;inset:12px;border-radius:12px;border:2px solid rgba(243,230,200,.5)"></div>
-          <div style="position:absolute;left:0;right:0;top:30px;text-align:center;font-family:'Bungee',sans-serif;font-size:13px;letter-spacing:5px;color:${shade(g.color, 0.78)};text-shadow:1px 1px 0 rgba(255,255,255,.35),-1px -1px 0 rgba(0,0,0,.35)">CLAYHOUSE</div>
-          <div style="position:absolute;left:0;right:0;top:66px;display:flex;justify-content:center">${phoneArt(g, 142)}</div>
-          <div style="position:absolute;left:0;right:0;bottom:66px;text-align:center"><div style="display:inline-block;font-family:'Bungee',sans-serif;font-size:${ts}px;line-height:1;background:linear-gradient(180deg,#fff1b8,#e0ac32 45%,#fff1b8 55%,#b9861d);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(2px 2px 0 #1B1B1B)">${esc(g.title)}</div></div>
-          <div style="position:absolute;left:0;right:0;bottom:34px;text-align:center;font-size:11px;font-weight:800;letter-spacing:3px;color:#F3E6C8;text-shadow:1px 1px 0 #1B1B1B">YOUR PHONE IS THE CONTROLLER</div>
-          <div style="position:absolute;right:22px;top:22px;width:56px;height:56px;border-radius:50%;background:#F3E6C8;border:3px solid #1B1B1B;display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(10deg);color:#1B1B1B"><div style="font-family:'Bungee',sans-serif;font-size:14px;line-height:1">${esc(g.players)}</div><div style="font-size:8px;font-weight:800;letter-spacing:1px">PLAYERS</div></div>
-          <div class="wear" style="opacity:.75"></div></div>
+        <div class="bub-front phonelid" aria-hidden="true" style="${face};left:0;top:0;width:100%;height:100%;border-radius:16px;background:linear-gradient(160deg,#FFFFFF,${W} 55%,#F1F1EC);box-shadow:inset 0 0 0 1px #E3E2DC">
+          <div style="position:absolute;left:0;right:0;top:56px;display:flex;justify-content:center">${phoneArt(g, 150)}</div>
+          <div style="position:absolute;left:0;right:0;bottom:62px;text-align:center;font-family:${SANS};font-size:${ts}px;font-weight:600;letter-spacing:-0.5px;color:#1D1D20">${esc(g.title)}</div>
+          <div style="position:absolute;left:0;right:0;bottom:38px;text-align:center;font-family:${SANS};font-size:11px;font-weight:500;letter-spacing:2px;color:#8C8B85">YOUR PHONE IS THE CONTROLLER · ${esc(g.players)} PLAYERS</div>
+          <div style="position:absolute;left:0;right:0;top:22px;text-align:center;font-family:${SANS};font-size:10px;font-weight:600;letter-spacing:5px;color:#C9C8C2;text-shadow:0 1px 0 #fff">CLAYHOUSE</div>
+        </div>
       </div>
     </button>`;
   };
