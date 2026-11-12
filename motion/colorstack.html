@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#2B5A97">
+<title>Clayhouse Color Stack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Color Stack: everyone sorts the same stacks on their own phone, the TV shows every board live, fastest wins.
+   One page, two modes: opened plainly it is the TV; opened from the QR (colorstack.html?phone#CODE) it is a phone. */
+:root{ --ink:#1B1B1B; --cream:#F3E6C8; --cream2:#FFF4DA; --gold:#F6C343; --rust:#B5541E; --red:#D8402B; --blue:#2B5A97; --navy:#23426E;
+  --disp:'Bungee',Impact,sans-serif; --ui:'Oswald','Arial Narrow',sans-serif }
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent }
+[hidden]{ display:none !important }
+html,body{ margin:0; height:100%; overflow:hidden; color:var(--cream); font-family:var(--ui);
+  background:radial-gradient(ellipse at 45% 40%,rgba(0,0,0,0) 55%,rgba(5,10,30,.45) 100%),
+    repeating-conic-gradient(from 0deg at 18% 78%,rgba(255,240,200,.07) 0deg 7deg,rgba(0,0,0,0) 7deg 14deg),var(--blue) }
+body{ user-select:none; -webkit-user-select:none; overscroll-behavior:none; touch-action:manipulation }
+.h{ font-family:var(--disp); font-weight:400; color:var(--gold); -webkit-text-stroke:1.5px var(--ink); text-shadow:2px 2px 0 var(--rust),4px 4px 0 var(--rust),6px 6px 0 var(--ink); margin:0; line-height:1 }
+.card{ background:var(--cream); color:var(--ink); border:3px solid var(--ink); border-radius:20px; box-shadow:6px 6px 0 var(--ink) }
+button{ font-family:var(--disp); font-size:22px; letter-spacing:.02em; color:var(--ink); background:var(--cream); border:3px solid var(--ink); border-radius:999px;
+  box-shadow:4px 4px 0 var(--ink); padding:14px 26px; cursor:pointer; transition:transform .1s, box-shadow .1s }
+button:active{ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--ink) }
+button.red{ background:var(--red); color:var(--cream) }
+button:disabled{ opacity:.5 }
+button:focus-visible{ outline:4px solid var(--gold); outline-offset:3px }
+
+/* the pieces and the stacks, shared by TV and phone */
+.tube{ position:relative; width:var(--tw); height:calc(var(--pc) * 4 + 22px); border:3px solid var(--ink); border-top:0; border-radius:0 0 calc(var(--tw) / 2.4) calc(var(--tw) / 2.4);
+  background:linear-gradient(90deg,rgba(255,255,255,.55),rgba(255,255,255,.18) 30%,rgba(255,255,255,.08) 70%,rgba(255,255,255,.4)); box-shadow:4px 4px 0 rgba(27,27,27,.55);
+  display:flex; flex-direction:column-reverse; align-items:center; gap:2px; padding:4px 4px 6px; transition:transform .16s cubic-bezier(.2,.8,.2,1) }
+.tube::before{ content:""; position:absolute; left:-9px; right:-9px; top:-6px; height:10px; border:3px solid var(--ink); border-radius:8px; background:var(--cream2) }
+.tube.sel{ transform:translateY(-22px) }
+.tube.full{ background:linear-gradient(90deg,rgba(255,244,190,.85),rgba(255,236,160,.45)); }
+.tube.full::after{ content:"\2605"; position:absolute; left:50%; top:-40px; transform:translateX(-50%); font-size:calc(var(--tw) * .42); color:var(--gold); -webkit-text-stroke:1.5px var(--ink); animation:pop .35s ease both }
+.pc{ width:100%; height:var(--pc); border:3px solid var(--ink); border-radius:12px; flex-shrink:0; position:relative;
+  background:radial-gradient(ellipse at 30% 25%,rgba(255,255,255,.55),rgba(255,255,255,0) 45%),radial-gradient(ellipse at 70% 90%,rgba(0,0,0,.25),rgba(0,0,0,0) 55%),var(--c);
+  display:flex; align-items:center; justify-content:center; font-size:calc(var(--pc) * .45); color:rgba(27,27,27,.38) }
+.pc.new{ animation:drop .22s cubic-bezier(.2,.8,.2,1) both }
+@keyframes drop{ from{ transform:translateY(-40%); opacity:.2 } to{ transform:none; opacity:1 } }
+@keyframes pop{ from{ transform:translateX(-50%) scale(.2) } to{ transform:translateX(-50%) scale(1) } }
+.racks{ display:flex; flex-wrap:wrap; justify-content:center; align-items:flex-end; gap:var(--gap) calc(var(--gap) * .9) }
+
+/* TV */
+#tv{ position:fixed; inset:0; display:flex; flex-direction:column; padding:28px 40px 24px; gap:18px }
+#tv header{ display:flex; align-items:center; justify-content:space-between; gap:20px }
+#tv header .h{ font-size:clamp(34px,4.2vw,64px) }
+#tv .meta{ display:flex; gap:12px; align-items:center }
+.chip{ font-family:var(--disp); font-size:18px; padding:8px 16px; border-radius:999px; border:3px solid var(--ink); background:var(--cream); color:var(--ink); box-shadow:3px 3px 0 var(--ink); white-space:nowrap }
+#lobby{ flex:1; display:grid; grid-template-columns:minmax(300px,420px) 1fr; gap:36px; align-items:center }
+#pair{ padding:26px; display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center }
+#qr{ width:100%; max-width:300px; aspect-ratio:1; background:#fff; border:3px solid var(--ink); border-radius:14px; padding:14px }
+#qr svg{ width:100%; height:100% }
+#pair .code{ font-family:var(--disp); font-size:54px; letter-spacing:.12em; line-height:1 }
+#pair p{ margin:0; font-size:20px; line-height:1.3 }
+#seats{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px }
+.seat{ padding:22px 24px; display:flex; align-items:center; gap:16px; min-height:110px }
+.seat .dot{ width:46px; height:46px; border-radius:50%; border:3px solid var(--ink); flex-shrink:0 }
+.seat b{ font-family:var(--disp); font-size:30px; font-weight:400; display:block }
+.seat span{ font-size:18px; opacity:.75 }
+.seat.empty{ opacity:.55; background:transparent; color:var(--cream); border-style:dashed; box-shadow:none; border-color:var(--cream) }
+.seat.empty .dot{ border-color:var(--cream); background:transparent !important }
+#lobbyTip{ grid-column:2; font-size:22px; margin:0; color:var(--cream); text-shadow:1px 1px 0 rgba(0,0,0,.35) }
+#lobbyGo{ grid-column:2; justify-self:start; font-size:30px; padding:18px 40px }
+#arena{ flex:1; display:grid; gap:26px; min-height:0 }
+.board{ position:relative; display:flex; flex-direction:column; padding:16px 18px 18px; min-height:0 }
+.board .top{ display:flex; align-items:center; gap:12px }
+.board .top .dot{ width:30px; height:30px; border-radius:50%; border:3px solid var(--ink) }
+.board .top b{ font-family:var(--disp); font-weight:400; font-size:30px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.board .top .t{ font-family:var(--disp); font-size:30px }
+.board .racks{ flex:1; align-content:center; padding-top:46px; min-height:0 }
+.board .foot{ display:flex; align-items:center; gap:14px; font-size:20px; font-weight:700 }
+.board .bar{ flex:1; height:16px; border:3px solid var(--ink); border-radius:10px; overflow:hidden; background:rgba(27,27,27,.1) }
+.board .bar i{ display:block; height:100%; width:0; transition:width .3s ease }
+.board .wins{ font-family:var(--disp); font-size:20px; letter-spacing:.1em; color:var(--rust) }
+.board.won{ box-shadow:0 0 0 6px var(--gold),8px 8px 0 var(--ink) }
+.board .stamp{ position:absolute; left:50%; top:80%; transform:translate(-50%,-50%) rotate(-8deg); font-family:var(--disp); font-size:clamp(40px,5.4vw,88px); color:var(--gold);
+  -webkit-text-stroke:2px var(--ink); text-shadow:4px 4px 0 var(--rust),7px 7px 0 var(--ink); pointer-events:none; animation:stamp .4s cubic-bezier(.2,.8,.2,1.3) both; white-space:nowrap;
+  background:var(--red); border:4px solid var(--ink); border-radius:20px; box-shadow:8px 8px 0 var(--ink); padding:14px 34px 20px; line-height:1 }
+.board .stamp.lose{ color:var(--ink); -webkit-text-stroke:0; text-shadow:none; background:var(--cream2); font-size:clamp(24px,2.6vw,44px); padding:14px 28px }
+.board.lost .racks{ opacity:.6 }
+@keyframes stamp{ from{ transform:translate(-50%,-50%) rotate(-8deg) scale(2.2); opacity:0 } to{ transform:translate(-50%,-50%) rotate(-8deg) scale(1); opacity:1 } }
+#count{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:5 }
+#count .h{ font-size:min(34vw,320px); -webkit-text-stroke:4px var(--ink); text-shadow:8px 8px 0 var(--rust),16px 16px 0 var(--ink); animation:stamp .35s cubic-bezier(.2,.8,.2,1.3) both }
+#after{ display:flex; gap:16px; justify-content:center; align-items:center; min-height:66px }
+#after.off{ visibility:hidden }
+#lobby:not([hidden]) ~ #after{ display:none }
+#after p{ margin:0; font-size:22px }
+
+/* phone */
+#ph{ position:fixed; inset:0; display:flex; flex-direction:column; gap:12px; padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left)) }
+#ph header{ display:flex; align-items:center; gap:10px }
+#ph header .h{ font-size:24px; flex:1; text-shadow:1px 1px 0 var(--rust),2px 2px 0 var(--rust),3px 3px 0 var(--ink) }
+#ph .chip{ font-size:13px; padding:6px 10px }
+.ph-sec{ flex:1; display:flex; flex-direction:column; gap:14px; min-height:0 }
+#phJoin{ justify-content:center }
+#phJoin .card,#phWait .card{ padding:20px; display:flex; flex-direction:column; gap:14px }
+#phJoin h2,#phWait h2{ font-family:var(--disp); font-weight:400; font-size:26px; margin:0; line-height:1.1 }
+#phJoin p,#phWait p{ margin:0; font-size:17px; line-height:1.35 }
+input{ font-family:var(--disp); font-size:26px; text-align:center; padding:12px; border:3px solid var(--ink); border-radius:14px; background:#fff; color:var(--ink); width:100%; min-width:0 }
+input#phCode{ letter-spacing:.3em; text-transform:uppercase; font-size:34px }
+#phWait{ justify-content:center }
+#phWait .me{ display:flex; align-items:center; gap:12px }
+#phWait .me .dot{ width:40px; height:40px; border-radius:50%; border:3px solid var(--ink) }
+#phWait .me b{ font-family:var(--disp); font-weight:400; font-size:26px }
+#phPlay .hud{ display:flex; gap:10px; align-items:stretch }
+#phPlay .hud .card{ flex:1; padding:8px 12px; border-radius:14px; box-shadow:3px 3px 0 var(--ink) }
+#phPlay .hud small{ display:block; font-size:12px; letter-spacing:.08em; text-transform:uppercase; opacity:.7 }
+#phPlay .hud b{ font-family:var(--disp); font-weight:400; font-size:22px }
+#phRacks{ flex:1; align-content:center; padding-top:40px; min-height:0 }
+#phPlay .row{ display:flex; gap:12px } #phPlay .row button{ flex:1; font-size:18px; padding:14px 10px }
+#phMsg{ text-align:center; font-family:var(--disp); font-size:22px; min-height:28px; color:var(--gold); -webkit-text-stroke:1px var(--ink); text-shadow:2px 2px 0 var(--ink) }
+#phCount{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(35,66,110,.55); z-index:5 }
+#phCount .h{ font-size:44vw; -webkit-text-stroke:3px var(--ink); animation:stamp .35s cubic-bezier(.2,.8,.2,1.3) both }
+</style>
+</head><body>
+
+<!-- the TV -->
+<main id="tv" hidden>
+  <header><h1 class="h">Color Stack</h1><div class="meta"><span class="chip" id="tvRound">Round 1</span><span class="chip" id="tvLink">Connecting</span></div></header>
+  <section id="lobby">
+    <div id="pair" class="card">
+      <div id="qr" aria-label="QR code to join"></div>
+      <div class="code" id="tvCode">----</div>
+      <p>Scan with your phone camera, or open <b id="tvUrl">the Clayhouse controller</b> and type the code.</p>
+    </div>
+    <div id="seats"></div>
+    <p id="lobbyTip">Everyone gets the same stacks. Tap a stack, tap where it goes. First to sort every color wins.</p>
+    <button id="lobbyGo" class="red" disabled>Start race</button>
+  </section>
+  <section id="arena" hidden></section>
+  <div id="after" class="off"><p id="afterTxt"></p><button id="nextBtn" class="red">Next round</button><button id="lobbyBtn">Players</button></div>
+  <div id="count" hidden></div>
+</main>
+
+<!-- the phone -->
+<main id="ph" hidden>
+  <header><h1 class="h">Color Stack</h1><span class="chip" id="phLink">Not connected</span></header>
+  <section id="phJoin" class="ph-sec">
+    <div class="card">
+      <h2>Join the race</h2>
+      <p>Type the four letters on the TV.</p>
+      <input id="phCode" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code">
+      <input id="phName" maxlength="10" placeholder="Your name" autocomplete="off" aria-label="Your name" style="font-size:22px;letter-spacing:0">
+      <button id="phGo" class="red">Join</button>
+    </div>
+  </section>
+  <section id="phWait" class="ph-sec" hidden>
+    <div class="card">
+      <div class="me"><span class="dot" id="phDot"></span><b id="phMe">Player</b></div>
+      <h2 id="phWaitH">You're in</h2>
+      <p id="phWaitP">Waiting for everyone. Any player can start the race.</p>
+      <input id="phName2" maxlength="10" placeholder="Change name" autocomplete="off" aria-label="Your name" style="font-size:20px;letter-spacing:0">
+      <button id="phStart" class="red">Start race</button>
+    </div>
+  </section>
+  <section id="phPlay" class="ph-sec" hidden>
+    <div class="hud">
+      <div class="card"><small>Time</small><b id="phTime">0:00.0</b></div>
+      <div class="card"><small>Moves</small><b id="phMoves">0</b></div>
+      <div class="card"><small id="phOppL">Rival</small><b id="phOpp">0%</b></div>
+    </div>
+    <div id="phRacks" class="racks"></div>
+    <div id="phMsg"></div>
+    <div class="row"><button id="phUndo">Undo</button><button id="phReset">Start over</button></div>
+  </section>
+  <div id="phCount" hidden></div>
+</main>
+
+<script src="lib/peerjs.min.js"></script>
+<script src="lib/mqtt.min.js?v=5"></script>
+<script src="link.js?v=5"></script>
+<script src="lib/qrcode.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const CAP = 4;
+const PIECE = ['#D8402B', '#F6C343', '#25919B', '#7A55C8', '#3A9160', '#E86FA0', '#E57A33', '#6FB7F0'];
+const GLYPH = ['●', '▲', '■', '◆', '★', '✚', '♥', '✦'];   // a mark on each color, for color-blind players
+const SEAT = ['#F6C343', '#7A55C8', '#25919B', '#E86FA0'];
+const SEATNAME = ['Gold', 'Purple', 'Teal', 'Pink'];
+const ONLINE = 'https://wuvvstudios.github.io/clayhouse-test/motion/colorstack.html';
+const fmt = ms => { ms = Math.max(0, ms | 0); const m = Math.floor(ms / 60000), s = Math.floor(ms / 1000) % 60, d = Math.floor(ms / 100) % 10; return m + ':' + String(s).padStart(2, '0') + '.' + d; };
+
+// ---------- the puzzle ----------
+// a board is an array of strings, bottom to top, one letter per piece ('a' is PIECE[0])
+const top = s => s[s.length - 1];
+function runLen(s){ let n = 1; while (n < s.length && s[s.length - 1 - n] === top(s)) n++; return n; }
+function canPour(b, i, j){
+  if (i === j || !b[i].length || b[j].length >= CAP) return false;
+  return !b[j].length || top(b[j]) === top(b[i]);
+}
+function pour(b, i, j){
+  const n = Math.min(runLen(b[i]), CAP - b[j].length), nb = b.slice();
+  nb[j] = b[j] + b[i].slice(-n); nb[i] = b[i].slice(0, -n); return nb;
+}
+const sortedTube = s => s.length === CAP && runLen(s) === CAP;
+const solved = b => b.every(s => !s.length || sortedTube(s));
+function progress(b, colors){ return b.filter(sortedTube).length / colors; }
+// depth-first search with a seen set; returns the number of moves of the first solution found, or -1
+function solvable(start){
+  const seen = new Set(); let nodes = 0;
+  const key = b => b.slice().sort().join('|');
+  function go(b, d){
+    if (solved(b)) return d;
+    if (++nodes > 150000) return -1;
+    const k = key(b); if (seen.has(k)) return -1; seen.add(k);
+    for (let i = 0; i < b.length; i++){
+      if (!b[i].length || sortedTube(b[i])) continue;
+      const uni = runLen(b[i]) === b[i].length;
+      for (let j = 0; j < b.length; j++){
+        if (!canPour(b, i, j)) continue;
+        if (uni && !b[j].length) continue;                 // moving a one-color stack into an empty tube changes nothing
+        const r = go(pour(b, i, j), d + 1); if (r >= 0) return r;
+      }
+    }
+    return -1;
+  }
+  return go(start, 0);
+}
+function makePuzzle(colors){
+  for (let tries = 0; tries < 400; tries++){
+    const bag = []; for (let c = 0; c < colors; c++) for (let k = 0; k < CAP; k++) bag.push(String.fromCharCode(97 + c));
+    for (let i = bag.length - 1; i > 0; i--){ const j = (Math.random() * (i + 1)) | 0; [bag[i], bag[j]] = [bag[j], bag[i]]; }
+    const b = []; for (let c = 0; c < colors; c++) b.push(bag.slice(c * CAP, c * CAP + CAP).join(''));
+    if (b.some(s => runLen(s) >= 3)) continue;              // no tube starts nearly done
+    b.push('', '');
+    if (solvable(b) >= 0) return b;
+  }
+  return null;
+}
+
+// ---------- drawing a rack of stacks (TV and phone) ----------
+function drawRacks(el, b, sel, prev){
+  if (el.children.length !== b.length){ el.innerHTML = b.map(() => '<div class="tube"></div>').join(''); prev = null; }
+  b.forEach((s, i) => {
+    const t = el.children[i];
+    t.classList.toggle('sel', sel === i); t.classList.toggle('full', sortedTube(s));
+    if (t.dataset.s === s) return;
+    const old = t.dataset.s || '';
+    t.dataset.s = s;
+    t.innerHTML = [...s].map((ch, k) => { const c = ch.charCodeAt(0) - 97; const fresh = prev && k >= old.length ? ' new' : ''; return `<div class="pc${fresh}" style="--c:${PIECE[c]}">${GLYPH[c]}</div>`; }).join('');
+  });
+}
+function sizeRacks(el, n, availW, availH){
+  // fit one or two rows of tubes into the space
+  let best = null;
+  for (const rows of [1, 2]){
+    const per = Math.ceil(n / rows);
+    // a tube is about 3.3 widths tall plus its rim; rows sit 0.9 widths apart so the next row's star has room
+    const tw = Math.min(availW / (per * 1.5 - 0.4), (availH - rows * 40) / (rows * 3.4 + (rows - 1) * 0.9));
+    if (!best || tw > best.tw) best = { tw, rows };
+  }
+  const tw = Math.max(26, Math.min(130, best.tw)), pc = tw * 0.82;
+  el.style.setProperty('--tw', tw + 'px'); el.style.setProperty('--pc', pc + 'px'); el.style.setProperty('--gap', (tw * 0.5) + 'px');
+  el.style.rowGap = (tw * 0.9) + 'px';
+}
+
+// =====================================================================================
+// TV
+// =====================================================================================
+function tv(){
+  $('tv').hidden = false;
+  let code = ClayLink.newCode(), link = null;
+  const players = [];               // {p, name, seat, board, moves, done, ms, seen, wins}
+  let st = 'lobby', round = 0, puzzle = null, colors = 0, goAt = 0, endAt = 0, winner = null, roundId = '';
+  const LEVEL = r => Math.min(8, 5 + Math.floor(r / 2));   // 5, 5, 6, 6, 7, 7, 8 colors
+
+  function url(){ return (location.protocol === 'https:' ? location.href.split('#')[0].split('?')[0] : ONLINE) + '?phone#' + code; }
+  function showPair(){
+    $('tvCode').textContent = code;
+    $('tvUrl').textContent = url().replace(/^https:\/\//, '').replace(/\?phone#.*/, '');
+    try { const qr = qrcode(0, 'M'); qr.addData(url()); qr.make(); $('qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch (_) { $('qr').textContent = code; }
+  }
+  function startLink(){
+    if (link) link.close();
+    link = ClayLink.host(code, onMsg, s => {
+      if (s === 'taken'){ code = ClayLink.newCode(); showPair(); startLink(); }
+      else if (s === 'ready' || s === 'relay') $('tvLink').textContent = 'Ready';
+    });
+  }
+  const send = o => link && link.send(o);
+  function roster(){ return players.map(p => ({ p: p.p, name: p.name, seat: p.seat, wins: p.wins })); }
+  function seatFree(){ for (let s = 0; s < 4; s++) if (!players.some(p => p.seat === s)) return s; return -1; }
+
+  function onMsg(m){
+    if (!m || typeof m.t !== 'string' || !m.p) return;
+    let pl = players.find(x => x.p === m.p);
+    if (m.t === 'cs-hi'){
+      const name = String(m.name || '').slice(0, 10).trim();
+      if (!pl){
+        if (st !== 'lobby' && st !== 'after') return;
+        const s = seatFree(); if (s < 0) return;
+        pl = { p: m.p, name: name || SEATNAME[s], seat: s, board: null, moves: 0, done: false, ms: 0, wins: 0, seen: 0 };
+        players.push(pl); players.sort((a, b) => a.seat - b.seat); renderSeats();
+      } else if (name && name !== pl.name){ pl.name = name; renderSeats(); if (st !== 'lobby') renderArena(); }
+      pl.seen = performance.now(); beacon(); return;
+    }
+    if (!pl) return;
+    pl.seen = performance.now();
+    if (m.t === 'cs-start' && (st === 'lobby' || st === 'after')) startRound();
+    if (m.t === 'cs-b' && m.r === roundId && Array.isArray(m.b) && (st === 'count' || st === 'play')){
+      if (pl.done) return;
+      pl.board = m.b.map(String); pl.moves = m.m | 0; updateBoard(pl);
+      if (m.done && solved(pl.board)){ pl.done = true; pl.ms = +m.ms || (performance.now() - goAt); finish(); }
+    }
+  }
+
+  // what every phone needs to know, sent every second so a dropped message never strands anyone
+  function beacon(){
+    const base = { t: 'cs-st', st, roster: roster(), round };
+    if (st === 'count' || st === 'play') Object.assign(base, { r: roundId, puzzle, left: Math.max(0, goAt - performance.now()), prog: players.map(p => [p.p, p.board ? progress(p.board, colors) : 0]) });
+    if (st === 'after') Object.assign(base, { r: roundId, win: winner && winner.p, res: players.map(p => [p.p, p.done ? p.ms : -1]) });
+    send(base);
+  }
+  setInterval(() => {
+    // drop phones that went quiet while nobody is playing
+    if (st === 'lobby' || st === 'after'){ const now = performance.now(); for (let i = players.length - 1; i >= 0; i--) if (now - players[i].seen > 20000){ players.splice(i, 1); renderSeats(); } }
+    beacon();
+  }, 1000);
+
+  function renderSeats(){
+    const n = Math.max(2, Math.min(4, players.length + (players.length < 4 ? 1 : 0)));
+    let h = '';
+    for (let s = 0; s < n; s++){
+      const p = players[s];
+      h += p ? `<div class="seat card"><span class="dot" style="background:${SEAT[p.seat]}"></span><div><b>${esc(p.name)}</b><span>${p.wins ? p.wins + (p.wins > 1 ? ' wins' : ' win') : 'Ready'}</span></div></div>`
+             : `<div class="seat card empty"><span class="dot"></span><div><b>Open</b><span>Scan to join</span></div></div>`;
+    }
+    $('seats').innerHTML = h;
+    $('lobbyGo').disabled = !players.length;
+    $('lobbyGo').textContent = players.length === 1 ? 'Start solo' : 'Start race';
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function startRound(){
+    if (!players.length) return;
+    colors = LEVEL(round); puzzle = makePuzzle(colors); if (!puzzle) return;
+    round++; roundId = Math.random().toString(36).slice(2, 8); winner = null; endAt = 0;
+    players.forEach(p => { p.board = puzzle.slice(); p.moves = 0; p.done = false; p.ms = 0; });
+    st = 'count'; goAt = performance.now() + 3600;
+    $('tvRound').textContent = 'Round ' + round + ' · ' + colors + ' colors';
+    $('lobby').hidden = true; $('after').classList.add('off'); $('arena').hidden = false;
+    renderArena(); beacon(); countdown();
+  }
+  function countdown(){
+    const c = $('count'); c.hidden = false; let last = '';
+    (function tick(){
+      const left = goAt - performance.now();
+      const txt = left > 2400 ? '3' : left > 1200 ? '2' : left > 0 ? '1' : 'GO';
+      if (txt !== last){ last = txt; c.innerHTML = `<div class="h">${txt}</div>`; }
+      if (left > -700) requestAnimationFrame(tick); else c.hidden = true;
+      if (left <= 0 && st === 'count'){ st = 'play'; beacon(); }
+    })();
+  }
+  function renderArena(){
+    const n = players.length, a = $('arena');
+    a.style.gridTemplateColumns = n === 1 ? 'minmax(0,1100px)' : n === 2 ? '1fr 1fr' : '1fr 1fr';
+    a.style.justifyContent = 'center';
+    a.innerHTML = players.map(p => `<div class="board card" id="bd${p.seat}">
+      <div class="top"><span class="dot" style="background:${SEAT[p.seat]}"></span><b>${esc(p.name)}</b><span class="t" id="tm${p.seat}">0:00.0</span></div>
+      <div class="racks" id="rk${p.seat}"></div>
+      <div class="foot"><span id="mv${p.seat}">0 moves</span><span class="bar"><i id="br${p.seat}" style="background:${SEAT[p.seat]}"></i></span><span class="wins">${'★'.repeat(p.wins)}</span></div></div>`).join('');
+    requestAnimationFrame(() => players.forEach(p => { fit(p); updateBoard(p, true); }));
+  }
+  function fit(p){
+    const rk = $('rk' + p.seat); if (!rk) return;
+    const box = rk.getBoundingClientRect();
+    sizeRacks(rk, puzzle.length, box.width, box.height - 46);
+  }
+  function updateBoard(p, force){
+    const rk = $('rk' + p.seat); if (!rk || !p.board) return;
+    drawRacks(rk, p.board, -1, force ? null : true);
+    $('mv' + p.seat).textContent = p.moves + (p.moves === 1 ? ' move' : ' moves');
+    $('br' + p.seat).style.width = Math.round(progress(p.board, colors) * 100) + '%';
+  }
+  function finish(){
+    if (endAt) return;
+    endAt = performance.now() + (players.length > 1 ? 450 : 0);   // a short grace so a near-tie is judged by each phone's own clock
+    setTimeout(() => {
+      const done = players.filter(p => p.done).sort((a, b) => a.ms - b.ms);
+      winner = done[0]; winner.wins++; st = 'after';
+      players.forEach(p => {
+        const bd = $('bd' + p.seat); if (!bd) return;
+        $('tm' + p.seat).textContent = p.done ? fmt(p.ms) : fmt(performance.now() - goAt);
+        const s = document.createElement('div');
+        if (p === winner){ bd.classList.add('won'); s.className = 'stamp'; s.textContent = players.length > 1 ? 'Winner' : fmt(p.ms); }
+        else { bd.classList.add('lost'); const k = p.board.filter(sortedTube).length; s.className = 'stamp lose'; s.textContent = k + ' of ' + colors + ' colors sorted'; }
+        bd.appendChild(s);
+      });
+      $('afterTxt').textContent = players.length > 1 ? `${winner.name} sorted it in ${fmt(winner.ms)}` : `Sorted in ${fmt(winner.ms)} with ${winner.moves} moves`;
+      $('after').classList.remove('off'); beacon(); renderSeats();
+    }, endAt - performance.now());
+  }
+  function clock(){
+    if (st === 'play') players.forEach(p => { if (!p.done){ const e = $('tm' + p.seat); if (e) e.textContent = fmt(performance.now() - goAt); } });
+    requestAnimationFrame(clock);
+  }
+  clock();
+  addEventListener('resize', () => { if (st !== 'lobby') players.forEach(p => { fit(p); }); });
+  $('lobbyGo').onclick = startRound;
+  $('nextBtn').onclick = startRound;
+  $('lobbyBtn').onclick = () => { st = 'lobby'; $('arena').hidden = true; $('after').classList.add('off'); $('lobby').hidden = false; renderSeats(); beacon(); };
+  addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ if ((st === 'lobby' || st === 'after') && players.length) startRound(); } });
+  showPair(); startLink(); renderSeats();
+  window.__cs = { players, get st(){ return st; } };
+}
+
+// =====================================================================================
+// phone
+// =====================================================================================
+function phone(){
+  $('ph').hidden = false;
+  let pid = ''; try { pid = sessionStorage.getItem('csPid') || ''; } catch (_) {}
+  if (!pid){ pid = Math.random().toString(36).slice(2, 10); try { sessionStorage.setItem('csPid', pid); } catch (_) {} }
+  let name = ''; try { name = localStorage.getItem('csName') || ''; } catch (_) {}
+  let link = null, code = '', me = null, st = 'join', rid = '', start = null, board = null, hist = [], sel = -1, moves = 0, goAt = 0, done = false, doneMs = 0, colors = 0, lastSt = 0;
+  const send = o => link && link.send(Object.assign({ p: pid }, o));
+  const show = id => ['phJoin', 'phWait', 'phPlay'].forEach(s => $(s).hidden = s !== id);
+  const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (_) {} };
+  $('phName').value = name;
+  try { const h = ClayLink.cleanCode(location.hash.slice(1)); if (h) $('phCode').value = h; } catch (_) {}
+
+  function join(){
+    code = ClayLink.cleanCode($('phCode').value); if (code.length !== 4){ $('phCode').focus(); return; }
+    name = $('phName').value.trim().slice(0, 10); try { localStorage.setItem('csName', name); } catch (_) {}
+    if (link) link.close();
+    link = ClayLink.join(code, onMsg, s => { $('phLink').textContent = s === 'direct' || s === 'relay' ? 'Connected' : s === 'nohost' ? 'No TV found' : 'Connecting'; });
+    st = 'wait'; show('phWait'); $('phWaitH').textContent = 'Finding the TV'; $('phWaitP').textContent = 'Room ' + code + '. Keep the Color Stack screen open on the TV.';
+  }
+  $('phGo').onclick = join;
+  $('phCode').addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
+  $('phStart').onclick = () => { send({ t: 'cs-start' }); buzz(20); };
+  $('phName2').addEventListener('change', () => { name = $('phName2').value.trim().slice(0, 10); try { localStorage.setItem('csName', name); } catch (_) {} send({ t: 'cs-hi', name }); });
+  if ($('phCode').value.length === 4 && name) join();
+  else if ($('phCode').value.length === 4) $('phName').focus();
+
+  // keep saying hello until the TV lists us; keep sending our board while we play
+  setInterval(() => {
+    if (!link) return;
+    if (!me) send({ t: 'cs-hi', name });
+    if (board && (st === 'play' || st === 'done')) sendBoard();
+    if (performance.now() - lastSt > 4000 && st !== 'join') $('phLink').textContent = 'Connecting';
+  }, 1000);
+  function sendBoard(){ send({ t: 'cs-b', r: rid, b: board, m: moves, done, ms: doneMs }); }
+
+  function onMsg(m){
+    if (!m || m.t !== 'cs-st') return;
+    lastSt = performance.now(); $('phLink').textContent = 'Connected';
+    const mine = (m.roster || []).find(x => x.p === pid);
+    if (!mine){ me = null; if (st === 'wait' || st === 'lobby'){ $('phWaitH').textContent = 'Joining'; $('phWaitP').textContent = (m.roster || []).length >= 4 ? 'The race is full. Four players at a time.' : 'Saying hello to the TV.'; } return; }
+    me = mine;
+    $('phDot').style.background = SEAT[me.seat]; $('phMe').textContent = me.name;
+    if (!$('phName2').value) $('phName2').placeholder = 'Change name (' + me.name + ')';
+    if (m.st === 'lobby'){ if (st !== 'lobby'){ st = 'lobby'; show('phWait'); } $('phWaitH').textContent = "You're in"; $('phWaitP').textContent = (m.roster.length > 1 ? m.roster.length + ' players ready. ' : 'Waiting for a rival, or race solo. ') + 'Any player can start.'; $('phStart').hidden = false; $('phStart').textContent = m.roster.length > 1 ? 'Start race' : 'Start solo'; }
+    if ((m.st === 'count' || m.st === 'play') && m.r !== rid) newRound(m);
+    if ((m.st === 'count' || m.st === 'play') && m.r === rid && m.prog){
+      const rivals = m.prog.filter(x => x[0] !== pid);
+      if (rivals.length){ const best = Math.max(...rivals.map(x => x[1])); $('phOpp').textContent = Math.round(best * 100) + '%'; $('phOppL').textContent = rivals.length > 1 ? 'Best rival' : 'Rival'; }
+      else { $('phOpp').textContent = '-'; $('phOppL').textContent = 'Solo'; }
+    }
+    if (m.st === 'after' && m.r === rid && st !== 'after'){
+      st = 'after';
+      const win = m.win === pid, solo = (m.roster || []).length === 1;
+      $('phMsg').textContent = solo ? 'Sorted in ' + fmt(doneMs) : win ? 'You win! ' + fmt(doneMs) : (m.roster.find(x => x.p === m.win) || {}).name + ' got it first';
+      buzz(win ? [60, 40, 60, 40, 160] : 200);
+      setTimeout(() => { if (st === 'after'){ show('phWait'); $('phWaitH').textContent = solo ? 'Nice sorting' : win ? 'You won that one' : 'So close'; $('phWaitP').textContent = 'Tap below for the next round. It gets harder.'; $('phStart').hidden = false; $('phStart').textContent = 'Next round'; } }, 2600);
+    }
+    if (m.st === 'lobby' && st === 'after'){ st = 'lobby'; show('phWait'); }
+  }
+
+  function newRound(m){
+    rid = m.r; start = m.puzzle.map(String); board = start.slice(); hist = []; sel = -1; moves = 0; done = false; doneMs = 0;
+    colors = start.filter(s => s.length).length;
+    goAt = performance.now() + (m.left || 0);
+    st = m.left > 0 ? 'count' : 'play'; show('phPlay'); $('phMsg').textContent = ''; $('phMoves').textContent = '0';
+    layout(); draw(true);
+    const c = $('phCount'); c.hidden = false; let last = '';
+    (function tick(){
+      const left = goAt - performance.now();
+      const txt = left > 2400 ? '3' : left > 1200 ? '2' : left > 0 ? '1' : 'GO';
+      if (txt !== last){ last = txt; c.innerHTML = `<div class="h">${txt}</div>`; buzz(txt === 'GO' ? 120 : 30); }
+      if (left > 0) requestAnimationFrame(tick);
+      else { st = 'play'; setTimeout(() => { c.hidden = true; }, 350); sendBoard(); }
+    })();
+  }
+  function layout(){ const r = $('phRacks').getBoundingClientRect(); sizeRacks($('phRacks'), start.length, r.width, r.height - 40); }
+  addEventListener('resize', () => { if (start) { layout(); draw(true); } });
+  function draw(force){ drawRacks($('phRacks'), board, sel, force ? null : true); }
+
+  $('phRacks').addEventListener('pointerdown', e => {
+    if (st !== 'play' || done) return;
+    const t = e.target.closest('.tube'); if (!t) return;
+    const i = [...$('phRacks').children].indexOf(t);
+    if (sel < 0){ if (board[i].length && !sortedTube(board[i])){ sel = i; buzz(8); draw(); } return; }
+    if (sel === i){ sel = -1; draw(); return; }
+    if (canPour(board, sel, i)){
+      hist.push(board); board = pour(board, sel, i); moves++; sel = -1; buzz(15);
+      $('phMoves').textContent = moves; draw();
+      if (solved(board)){ done = true; doneMs = performance.now() - goAt; st = 'done'; $('phTime').textContent = fmt(doneMs); $('phMsg').textContent = 'Sorted! ' + fmt(doneMs); buzz([40, 30, 40]); }
+      sendBoard();
+    } else if (board[i].length && !sortedTube(board[i])){ sel = i; buzz(8); draw(); }
+    else { sel = -1; draw(); }
+  });
+  $('phUndo').onclick = () => { if (st !== 'play' || !hist.length) return; board = hist.pop(); moves++; sel = -1; $('phMoves').textContent = moves; draw(); sendBoard(); };
+  $('phReset').onclick = () => { if (st !== 'play' || !hist.length) return; board = start.slice(); hist = []; sel = -1; moves++; $('phMoves').textContent = moves; draw(); sendBoard(); };
+  (function clock(){ if (st === 'play') $('phTime').textContent = fmt(performance.now() - goAt); requestAnimationFrame(clock); })();
+}
+
+if (/[?&]phone\b/.test(location.search) || /pad/.test(location.search)) phone(); else tv();
+})();
+</script>
+</body></html>
