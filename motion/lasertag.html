@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clayhouse Laser Tag</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{ --bg:#0b0f24; --panel:rgba(16,20,46,.86); --line:#2a3166; --fg:#eef1ff; --dim:#9aa3d6; --mint:#5cf2cf; --pink:#ff4fa8; --amber:#ffb84d;
+  --disp:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif; color-scheme:dark }
+*{ box-sizing:border-box }
+[hidden]{ display:none !important }
+html,body{ margin:0; height:100%; overflow:hidden; background:var(--bg); color:var(--fg); font-family:var(--body) }
+canvas#gl{ position:fixed; inset:0; width:100%; height:100%; display:block; cursor:none }
+.card{ background:var(--panel); border:1px solid var(--line); border-radius:18px; backdrop-filter:blur(8px) }
+#hud{ position:fixed; top:16px; left:16px; right:16px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; pointer-events:none }
+#title{ font-family:var(--disp); font-weight:700; font-size:22px; padding:10px 16px }
+#title b{ color:var(--pink) }
+#stats{ display:flex; gap:10px }
+.stat{ padding:10px 16px; min-width:104px; text-align:center }
+.stat small{ display:block; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim) }
+.stat span{ font-family:var(--disp); font-weight:700; font-size:26px }
+#shields{ display:flex; gap:6px; justify-content:center; margin-top:6px }
+#shields i{ width:14px; height:14px; border-radius:4px; background:var(--mint); box-shadow:0 0 8px var(--mint) }
+#shields i.off{ background:#2a3166; box-shadow:none }
+#pair{ position:fixed; right:16px; bottom:16px; width:300px; padding:16px; display:flex; flex-direction:column; gap:10px; transition:all .3s }
+#pair.big{ right:50%; bottom:50%; transform:translate(50%,50%); width:min(560px,92vw); padding:26px }
+#pair h2{ margin:0; font-family:var(--disp); font-size:22px }
+#pair.big h2{ font-size:32px }
+#pair p{ margin:0; color:var(--dim); line-height:1.45; font-size:14px }
+#pair.big p{ font-size:16px }
+.pairRow{ display:flex; gap:16px; align-items:center }
+#qr{ width:118px; height:118px; background:#fff; padding:8px; border-radius:10px; flex-shrink:0 }
+#pair:not(.big) #qr{ width:80px; height:80px; padding:5px }
+#qr svg{ width:100%; height:100% }
+#code{ font-family:var(--disp); font-weight:700; font-size:44px; letter-spacing:.2em; color:var(--mint) }
+#pair:not(.big) #code{ font-size:28px }
+.phones{ display:flex; gap:8px; flex-wrap:wrap }
+.ph{ font-size:12px; letter-spacing:.06em; text-transform:uppercase; padding:6px 10px; border-radius:99px; border:1px solid var(--line); color:var(--dim) }
+.ph.on{ background:var(--mint); color:var(--bg); border-color:var(--mint) }
+.btns{ display:flex; gap:10px; flex-wrap:wrap }
+button{ font:600 16px var(--body); border:0; border-radius:14px; padding:14px 18px; color:var(--bg); background:var(--mint); cursor:pointer; pointer-events:auto }
+button.ghost{ background:transparent; color:var(--fg); border:2px solid var(--line) }
+button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
+#pair:not(.big) .btns, #pair:not(.big) p, #pair:not(.big) h2{ display:none }
+#pair:not(.big){ width:auto }
+#reticle{ position:fixed; width:54px; height:54px; margin:-27px 0 0 -27px; border:3px solid var(--mint); border-radius:50%; pointer-events:none; box-shadow:0 0 14px var(--mint); transition:border-color .1s }
+#reticle::after{ content:""; position:absolute; left:50%; top:50%; width:8px; height:8px; margin:-4px; border-radius:50%; background:var(--pink) }
+#reticle.over{ border-color:var(--pink); box-shadow:0 0 18px var(--pink) }
+#flash{ position:fixed; inset:0; pointer-events:none; background:radial-gradient(ellipse at center, rgba(255,79,168,0) 40%, rgba(255,79,168,.55) 100%); opacity:0; transition:opacity .25s }
+#toast{ position:fixed; left:50%; top:96px; transform:translateX(-50%); padding:12px 22px; font-family:var(--disp); font-size:22px; font-weight:700; opacity:0; transition:opacity .3s; pointer-events:none; white-space:nowrap }
+#toast.show{ opacity:1 }
+#banner{ position:fixed; left:50%; top:42%; transform:translate(-50%,-50%); font-family:var(--disp); font-weight:700; font-size:min(10vw,96px); color:var(--fg); text-shadow:0 0 30px var(--pink); pointer-events:none; opacity:0; transition:opacity .3s; white-space:nowrap }
+#banner.show{ opacity:1 }
+#end{ position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); width:min(520px,92vw); padding:28px; text-align:center; display:flex; flex-direction:column; gap:12px }
+#end h2{ margin:0; font-family:var(--disp); font-size:34px }
+#endScore{ font-family:var(--disp); font-weight:700; font-size:72px; color:var(--mint) }
+#end p{ margin:0; color:var(--dim) }
+#end .btns{ justify-content:center }
+#help{ position:fixed; left:16px; bottom:16px; padding:12px 16px; font-size:13px; color:var(--dim); max-width:360px; line-height:1.5 }
+#help b{ color:var(--fg) }
+</style>
+</head><body>
+<canvas id="gl"></canvas>
+<div id="flash"></div>
+<div id="hud">
+  <div id="title" class="card">Clay<b>house</b> Laser Tag</div>
+  <div id="stats">
+    <div class="stat card"><small>Score</small><span id="scoreV">0</span></div>
+    <div class="stat card"><small>Tags</small><span id="tagsV">0</span></div>
+    <div class="stat card"><small>Time</small><span id="timeV">1:30</span></div>
+    <div class="stat card"><small>Vest</small><div id="shields"></div></div>
+  </div>
+</div>
+<div id="reticle" hidden></div>
+<div id="toast" class="card"></div>
+<div id="banner"></div>
+
+<div id="pair" class="card big">
+  <h2>Laser Tag</h2>
+  <div class="pairRow">
+    <div id="qr" aria-label="QR code that opens the phone controller"></div>
+    <div>
+      <div id="code">····</div>
+      <p>Scan with your phone, or open the controller and type the code. Pick <b>Controller</b> to aim and fire.</p>
+    </div>
+  </div>
+  <p>Got a balance board? Join with a second phone, pick <b>Board</b>, lay it flat on the board with the top pointing at the TV, and lean to move.</p>
+  <div class="phones"><span id="phAim" class="ph">Controller phone</span><span id="phBoard" class="ph">Board phone</span></div>
+  <div class="btns"><button id="startBtn">Start round</button><button id="mouseBtn" class="ghost">Play with mouse and keys</button></div>
+</div>
+
+<div id="help" class="card" hidden><b>Mouse:</b> aim and click to tag. <b>W A S D:</b> move. Aim at the edge of the screen to turn. <b>C</b> recenters the phone.</div>
+
+<div id="end" class="card" hidden>
+  <h2>Round over!</h2>
+  <div id="endScore">0</div>
+  <p id="endNote"></p>
+  <div class="btns"><button id="againBtn">Play again</button><button id="backBtn" class="ghost">Back to games</button></div>
+</div>
+
+<script src="lib/three.min.js"></script>
+<script src="lib/clayfigure_data.js"></script>
+<script src="lib/clayfigure.js"></script>
+<script src="lib/clayavatar.js"></script>
+<script src="lib/peerjs.min.js"></script>
+<script src="lib/mqtt.min.js?v=3"></script>
+<script src="lib/qrcode.js"></script>
+<script src="link.js?v=5"></script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rnd = (a, b) => a + Math.random() * (b - a);
+const PAD_HOME = 'https://wuvvstudios.github.io/clayhouse-test/motion/pad.html';
+const ROUND = 90, VEST = 5;
+
+// ------------------------------------------------------------ renderer and arena
+const canvas = $('gl');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#090c1f');
+scene.fog = new THREE.Fog('#090c1f', 14, 34);
+const cam = new THREE.PerspectiveCamera(68, 1, 0.05, 80);
+function resize(){ renderer.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+scene.add(new THREE.HemisphereLight('#7f8fe0', '#120a24', 0.42));
+const key = new THREE.DirectionalLight('#c9d2ff', 0.38); key.position.set(4, 10, 6); scene.add(key);
+
+const HALF = 13;
+const MINT = new THREE.Color('#5cf2cf'), PINK = new THREE.Color('#ff4fa8'), AMBER = new THREE.Color('#ffb84d'), RED = new THREE.Color('#ff3b3b');
+(function floor(){
+  const g = new THREE.PlaneGeometry(HALF * 2, HALF * 2); g.rotateX(-Math.PI / 2);
+  scene.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: '#06081a', roughness: 0.95 })));
+  const grid = new THREE.GridHelper(HALF * 2, 26, '#ff4fa8', '#2b2f6b'); grid.position.y = 0.005; grid.material.transparent = true; grid.material.opacity = 0.5; scene.add(grid);
+  const wallM = new THREE.MeshStandardMaterial({ color: '#0b0f2a', roughness: 0.85 });
+  for (const [x, z, w, d] of [[0, -HALF, HALF * 2, 0.3], [0, HALF, HALF * 2, 0.3], [-HALF, 0, 0.3, HALF * 2], [HALF, 0, 0.3, HALF * 2]]){
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 3.2, d), wallM); m.position.set(x, 1.6, z); scene.add(m);
+    const s = new THREE.Mesh(new THREE.BoxGeometry(w, 0.06, d + 0.02), new THREE.MeshBasicMaterial({ color: '#5cf2cf' })); s.position.set(x, 0.9, z); scene.add(s);
+  }
+})();
+// cover: foam blocks and pillars with glowing edges
+const COVER = [];
+function block(x, z, w, h, d, c){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: '#121838', roughness: 0.75 }));
+  m.position.set(x, h / 2, z); scene.add(m);
+  const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: c })); e.position.copy(m.position); scene.add(e);
+  COVER.push({ x, z, w, d, h, mesh: m });
+}
+[[-5, -4, 3, 1.4, 0.8, '#ff4fa8'], [4, -6, 0.8, 1.4, 3, '#5cf2cf'], [0, -9, 4, 1.2, 0.8, '#ffb84d'], [-8, -9, 1.2, 2.6, 1.2, '#5cf2cf'], [8, -10, 1.2, 2.6, 1.2, '#ff4fa8'],
+ [-9, 1, 0.8, 1.4, 3.4, '#ffb84d'], [9, 2, 0.8, 1.4, 3.4, '#5cf2cf'], [-3, 5, 2.6, 1.2, 0.8, '#5cf2cf'], [5, 6, 1.2, 2.6, 1.2, '#ffb84d'], [0, 0, 1.2, 2.6, 1.2, '#ff4fa8'],
+ [-7, 9, 3, 1.4, 0.8, '#ff4fa8'], [7, 10, 3, 1.2, 0.8, '#5cf2cf']].forEach(b => block(...b));
+// hanging neon rings for atmosphere
+for (let i = 0; i < 6; i++){ const r = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.04, 8, 40), new THREE.MeshBasicMaterial({ color: i % 2 ? '#ff4fa8' : '#5cf2cf' }));
+  r.position.set(rnd(-10, 10), 4.2, rnd(-10, 10)); r.rotation.x = Math.PI / 2; scene.add(r); }
+
+function blocked(x, z, r){
+  if (Math.abs(x) > HALF - r - 0.2 || Math.abs(z) > HALF - r - 0.2) return true;
+  for (const c of COVER) if (Math.abs(x - c.x) < c.w / 2 + r && Math.abs(z - c.z) < c.d / 2 + r) return true;
+  return false;
+}
+
+// ------------------------------------------------------------ toy figures (jointed, painted-vinyl look)
+const vinyl = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.38, metalness: 0.02 });
+const SKINS = ['#8d5524', '#c68642', '#5c3a21', '#e0ac69', '#a0522d', '#f1c27d'];
+const SHIRTS = ['#f2c230', '#2f6db5', '#e57a33', '#7a3fb5', '#3a9160', '#f3f0e8'];
+function figure(team){
+  const g = new THREE.Group(), skin = vinyl(SKINS[(Math.random() * SKINS.length) | 0]), shirt = vinyl(SHIRTS[(Math.random() * SHIRTS.length) | 0]);
+  const pants = vinyl('#23284f'), dark = vinyl('#14163a');
+  const vestC = team === 'pink' ? PINK : AMBER;
+  const vest = new THREE.MeshStandardMaterial({ color: '#1b1b2e', emissive: vestC, emissiveIntensity: 1.4, roughness: 0.5 });
+  const part = (geo, mat, x, y, z, parent) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); (parent || g).add(m); return m; };
+  part(new THREE.CylinderGeometry(0.2, 0.17, 0.55, 14), shirt, 0, 1.18, 0);                         // chest
+  part(new THREE.CylinderGeometry(0.23, 0.22, 0.32, 14), vest, 0, 1.24, 0);                         // glowing vest
+  part(new THREE.CylinderGeometry(0.17, 0.16, 0.22, 14), pants, 0, 0.84, 0);                        // hips
+  part(new THREE.CylinderGeometry(0.05, 0.05, 0.1, 10), skin, 0, 1.5, 0);                            // neck peg
+  const head = part(new THREE.SphereGeometry(0.17, 18, 14), skin, 0, 1.68, 0);
+  head.scale.set(0.95, 1.08, 0.95);
+  part(new THREE.SphereGeometry(0.175, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2.1), dark, 0, 1.72, 0);  // hair cap
+  const visor = part(new THREE.BoxGeometry(0.26, 0.06, 0.1), new THREE.MeshBasicMaterial({ color: vestC }), 0, 1.69, 0.13);
+  for (const s of [-1, 1]){
+    part(new THREE.SphereGeometry(0.075, 12, 10), shirt, s * 0.24, 1.4, 0);                           // ball shoulder
+    const upper = part(new THREE.CylinderGeometry(0.055, 0.05, 0.3, 10), skin, s * 0.27, 1.24, 0.06); upper.rotation.x = -0.6;
+    part(new THREE.SphereGeometry(0.05, 10, 8), skin, s * 0.27, 1.12, 0.16);                          // elbow pin
+    const fore = part(new THREE.CylinderGeometry(0.05, 0.045, 0.28, 10), skin, s * 0.16, 1.16, 0.3); fore.rotation.set(Math.PI / 2, 0, s * 0.9);
+    part(new THREE.CylinderGeometry(0.075, 0.07, 0.42, 12), pants, s * 0.1, 0.55, 0);                 // thigh
+    part(new THREE.SphereGeometry(0.065, 10, 8), pants, s * 0.1, 0.34, 0.01);                         // knee pin
+    part(new THREE.CylinderGeometry(0.065, 0.06, 0.3, 12), pants, s * 0.1, 0.19, 0);                  // shin
+    part(new THREE.BoxGeometry(0.13, 0.08, 0.24), vinyl('#f3f0e8'), s * 0.1, 0.04, 0.04);             // shoe
+  }
+  const blaster = new THREE.Group(); blaster.position.set(0, 1.18, 0.42); g.add(blaster);
+  part(new THREE.BoxGeometry(0.1, 0.12, 0.34), vinyl('#ff8a3d'), 0, 0, 0, blaster);
+  part(new THREE.CylinderGeometry(0.035, 0.04, 0.12, 12), vinyl('#ff5fa2'), 0, 0.01, 0.22, blaster).rotation.x = Math.PI / 2;
+  g.userData = { head, vest, blaster, visor };
+  g.traverse(o => { if (o.isMesh) o.userData.fig = g; });
+  // the real Clayhouse action figure, blaster up; the toy above stays as the vest, visor and blaster
+  if (window.ClayAvatar && ClayAvatar.figOn && ClayAvatar.figOn()){
+    const av = ClayAvatar.make(ClayAvatar.npcSpec(FIGN++), { height: 1.82, shirt: '#' + shirt.color.getHexString() }); g.add(av.root); g.userData.av = av;
+    for (let i = 0; i < 2; i++){ const sd = i ? -1 : 1; av.arms[i].rotation.set(-0.7, 0, sd * 0.12); av.fores[i].rotation.set(-1.05, 0, 0); }
+    g.traverse(o => { if (o.isMesh && o.material === vest){ o.scale.set(0.95, 0.55, 0.85); o.position.y = 1.3; } });
+    const keep = [vest, visor]; blaster.traverse(o => keep.push(o.material));
+    const wear = () => { if (!av.rig.fig) return setTimeout(wear, 60);
+      g.traverse(o => { if (o.isMesh){ o.userData.fig = g; if (o.material && o.material.isMeshStandardMaterial && keep.indexOf(o.material) < 0 && !av.root.getObjectById(o.id)) o.visible = false; } }); };
+    wear();
+  }
+  return g;
+}
+let FIGN = 0;
+
+// ------------------------------------------------------------ input: two phones (blaster + board), or mouse and keys
+const Ctrl = { aimX: 0, aimY: 0, fireCount: 0, held: false, aimPhone: null, boardPhone: null,
+  rc: {}, h0: null, p0: null, fwd: 0, side: 0, b0: null, g0: null, keys: {}, mouse: false, lastAim: 0, lastBoard: 0 };
+const _q = new THREE.Quaternion(), _v = new THREE.Vector3();
+const wrap = a => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
+function onPhone(m, from){
+  if (!m || m.t !== 'm') return;
+  const now = performance.now() / 1000;
+  if (m.role === 'board'){
+    if (Ctrl.boardPhone !== from){ Ctrl.boardPhone = from; Ctrl.b0 = null; toast('Board phone connected. Lean to move'); setPhones(); }
+    Ctrl.lastBoard = now;
+    if (typeof m.b !== 'number') return;
+    if (Ctrl.b0 === null || Ctrl.rc[from] !== m.rc){ Ctrl.rc[from] = m.rc; Ctrl.b0 = m.b; Ctrl.g0 = m.g; if (Ctrl.b0 !== null) toast('Board centered'); }
+    const dz = v => Math.abs(v) < 2.5 ? 0 : (v - Math.sign(v) * 2.5);
+    Ctrl.fwd = clamp(-dz(m.b - Ctrl.b0) / 11, -1, 1);
+    Ctrl.side = clamp(dz(m.g - Ctrl.g0) / 11, -1, 1);
+    return;
+  }
+  if (!m.q) return;
+  if (Ctrl.aimPhone !== from){ Ctrl.aimPhone = from; Ctrl.h0 = null; Ctrl.fire = m.fire; toast('Blaster phone connected. Point it at the screen and tap Center'); setPhones(); if (link) link.send({ t: 'hi', game: 'lasertag' }); }
+  Ctrl.lastAim = now;
+  _q.set(m.q[0], m.q[1], m.q[2], m.q[3]); _v.set(0, 1, 0).applyQuaternion(_q);
+  const h = Math.atan2(_v.x, _v.y), p = Math.asin(clamp(_v.z, -1, 1));
+  if (Ctrl.h0 === null || Ctrl.rc[from] !== m.rc){ Ctrl.rc[from] = m.rc; Ctrl.h0 = h; Ctrl.p0 = p; toast('Centered'); }
+  Ctrl.aimX = clamp(wrap(h - Ctrl.h0) / 0.5, -1.05, 1.05);
+  Ctrl.aimY = clamp((p - Ctrl.p0) / 0.38, -1.05, 1.05);
+  if (Ctrl.fire !== m.fire){ if (typeof Ctrl.fire === 'number' && m.fire > Ctrl.fire) Ctrl.fireCount += m.fire - Ctrl.fire; Ctrl.fire = m.fire; }
+  Ctrl.held = !!m.held;
+}
+function setPhones(){
+  const now = performance.now() / 1000;
+  $('phAim').classList.toggle('on', !!Ctrl.aimPhone && now - Ctrl.lastAim < 2.5);
+  $('phBoard').classList.toggle('on', !!Ctrl.boardPhone && now - Ctrl.lastBoard < 2.5);
+}
+addEventListener('pointermove', e => { if (Ctrl.aimPhone && performance.now() / 1000 - Ctrl.lastAim < 2.5) return; Ctrl.aimX = e.clientX / innerWidth * 2 - 1; Ctrl.aimY = -(e.clientY / innerHeight * 2 - 1); });
+canvas.addEventListener('pointerdown', () => { Snd.init(); if (!(Ctrl.aimPhone && performance.now() / 1000 - Ctrl.lastAim < 2.5)) Ctrl.fireCount++; });
+addEventListener('keydown', e => { Snd.init(); Ctrl.keys[e.key.toLowerCase()] = true; if (e.key === 'c' || e.key === 'C'){ Ctrl.h0 = null; Ctrl.b0 = null; } if (e.key === ' ' ) Ctrl.fireCount++; });
+addEventListener('keyup', e => { Ctrl.keys[e.key.toLowerCase()] = false; });
+
+// ------------------------------------------------------------ sound (tiny synth, no files)
+const Snd = (() => {
+  let ac = null;
+  function init(){ if (ac) { if (ac.state === 'suspended') ac.resume(); return; } try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) {} }
+  function tone(f1, f2, d, type, vol){ if (!ac) return; const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + d);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d + 0.02); }
+  return { init,
+    zap(){ tone(1400, 220, 0.16, 'sawtooth', 0.08); },
+    tag(){ tone(520, 1560, 0.12, 'square', 0.07); setTimeout(() => tone(780, 2100, 0.14, 'square', 0.06), 70); },
+    charge(){ tone(300, 520, 0.4, 'triangle', 0.035); },
+    hit(){ tone(240, 120, 0.3, 'triangle', 0.09); },
+    start(){ tone(440, 880, 0.18, 'square', 0.06); setTimeout(() => tone(660, 1320, 0.25, 'square', 0.06), 160); } };
+})();
+
+// ------------------------------------------------------------ game state
+const P = { x: 0, z: 11, yaw: 0, vest: VEST, recharge: 0, score: 0, tags: 0, combo: 0, best: 0, hitsTaken: 0 };
+let mode = 'pair', timeLeft = ROUND, link = null, code = ClayLink.newCode();
+const bots = [], bolts = [], beams = [];
+const SPOTS = [];
+for (const c of COVER) for (const s of [-1, 1]){
+  const along = c.w > c.d;
+  const hx = c.x + (along ? 0 : s * (c.w / 2 + 0.7)), hz = c.z + (along ? s * (c.d / 2 + 0.7) : 0);
+  const px = c.x + (along ? s * (c.w / 2 + 0.6) : s * (c.w / 2 + 0.7)), pz = hz;
+  if (!blocked(hx, hz, 0.3) && !blocked(px, pz, 0.3)) SPOTS.push({ hide: new THREE.Vector3(hx, 0, hz), peek: new THREE.Vector3(px, 0, pz), busy: false });
+}
+function spawnBot(){
+  const free = SPOTS.filter(s => !s.busy && Math.hypot(s.hide.x - P.x, s.hide.z - P.z) > 5);
+  if (!free.length) return;
+  const spot = free[(Math.random() * free.length) | 0]; spot.busy = true;
+  const fig = figure(Math.random() < 0.5 ? 'pink' : 'amber');
+  fig.position.copy(spot.hide); scene.add(fig);
+  bots.push({ fig, spot, state: 'hide', t: rnd(0.4, 1.4), sight: null });
+}
+function sightLine(){ const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+  const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: '#ff3b3b', transparent: true, opacity: 0.8 })); scene.add(l); return l; }
+const eye = () => new THREE.Vector3(P.x, 1.55, P.z);
+function hasLOS(a, b){
+  const dir = b.clone().sub(a), len = dir.length(); dir.normalize();
+  const rc = new THREE.Raycaster(a, dir, 0, len); return !rc.intersectObjects(COVER.map(c => c.mesh)).length;
+}
+function botFrame(b, dt){
+  b.t -= dt; const f = b.fig;
+  const toP = Math.atan2(P.x - f.position.x, P.z - f.position.z);
+  f.rotation.y += wrap(toP - f.rotation.y) * Math.min(1, dt * 6);
+  f.position.y = Math.abs(Math.sin(performance.now() / 160 + f.id)) * (b.state === 'move' ? 0.05 : 0);
+  if (b.state === 'down'){ f.rotation.x = Math.min(1.35, f.rotation.x + dt * 5); f.position.y = 0; if (b.t <= 0){ scene.remove(f); b.spot.busy = false; b.dead = true; } return; }
+  if (b.state === 'hide' && b.t <= 0){ b.state = 'move'; b.t = 0.5; b.from = f.position.clone(); b.to = b.spot.peek; }
+  else if (b.state === 'move'){ const k = 1 - Math.max(0, b.t) / 0.5; f.position.x = b.from.x + (b.to.x - b.from.x) * k; f.position.z = b.from.z + (b.to.z - b.from.z) * k;
+    if (b.t <= 0){ if (b.to === b.spot.peek){ b.state = 'aim'; b.t = 1.35; Snd.charge(); b.sight = sightLine(); } else { b.state = 'hide'; b.t = rnd(1.2, 2.4); } } }
+  else if (b.state === 'aim'){
+    if (!b.sight){ b.state = 'hide'; b.t = 1; return; }
+    const from = f.localToWorld(new THREE.Vector3(0, 1.2, 0.6)), to = eye().add(new THREE.Vector3(0, -0.25, 0));
+    const pos = b.sight.geometry.attributes.position; pos.setXYZ(0, from.x, from.y, from.z); pos.setXYZ(1, to.x, to.y, to.z); pos.needsUpdate = true;
+    b.sight.material.opacity = 0.35 + 0.5 * Math.abs(Math.sin(performance.now() / 60));
+    b.sight.visible = hasLOS(from, to);
+    if (b.t <= 0){ scene.remove(b.sight); b.sight = null; if (hasLOS(from, to)) fireBolt(from, to); b.state = 'move'; b.t = 0.5; b.from = f.position.clone(); b.to = b.spot.hide; }
+  }
+}
+function fireBolt(from, to){
+  const m = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 10), new THREE.MeshBasicMaterial({ color: '#ff3b3b' }));
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.26, 14, 10), new THREE.MeshBasicMaterial({ color: '#ff6b8b', transparent: true, opacity: 0.35 })); m.add(glow);
+  m.position.copy(from); scene.add(m);
+  bolts.push({ m, v: to.clone().sub(from).normalize().multiplyScalar(6), life: 4.5 });
+}
+function boltFrame(b, dt){
+  b.m.position.addScaledVector(b.v, dt); b.life -= dt;
+  const pp = b.m.position, ep = eye();
+  if (Math.hypot(pp.x - ep.x, pp.z - ep.z) < 0.45 && pp.y > 0.6 && pp.y < 1.9){ b.life = 0; playerHit(); }
+  for (const c of COVER) if (Math.abs(pp.x - c.x) < c.w / 2 && Math.abs(pp.z - c.z) < c.d / 2 && pp.y < c.h) b.life = 0;
+  if (b.life <= 0){ scene.remove(b.m); b.dead = true; }
+}
+function playerHit(){
+  if (P.recharge > 0 || mode !== 'play') return;
+  P.vest = Math.max(0, P.vest - 1); P.combo = 0; P.hitsTaken++; Snd.hit();
+  $('flash').style.opacity = 1; setTimeout(() => $('flash').style.opacity = 0, 260);
+  if (link) link.send({ t: 'buzz', ms: 60 });
+  if (P.vest === 0){ P.recharge = 2.2; toast('Vest recharging'); setTimeout(() => { P.vest = VEST; }, 2200); }
+  shieldsUI();
+}
+
+// ------------------------------------------------------------ shooting
+const ray = new THREE.Raycaster();
+function shoot(){
+  if (P.recharge > 0) { Snd.charge(); return; }
+  Snd.zap(); ray.setFromCamera({ x: Ctrl.aimX, y: Ctrl.aimY }, cam);
+  const targets = bots.filter(b => b.state !== 'down').map(b => b.fig);
+  const hits = ray.intersectObjects(targets.concat(COVER.map(c => c.mesh)), true);
+  let end = ray.ray.origin.clone().addScaledVector(ray.ray.direction, 30);
+  if (hits.length){
+    end = hits[0].point;
+    const fig = hits[0].object.userData.fig;
+    if (fig){ const b = bots.find(x => x.fig === fig); if (b) tagBot(b); }
+  }
+  const start = cam.localToWorld(new THREE.Vector3(0.28, -0.25, -0.4));
+  const g = new THREE.BufferGeometry().setFromPoints([start, end]);
+  const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: '#5cf2cf', transparent: true, opacity: 1 })); scene.add(l);
+  beams.push({ l, t: 0.14 });
+}
+function tagBot(b){
+  if (b.sight){ scene.remove(b.sight); b.sight = null; }
+  b.state = 'down'; b.t = 1.4; b.fig.userData.vest.emissive.copy(MINT); Snd.tag();
+  P.combo++; P.best = Math.max(P.best, P.combo); P.tags++;
+  const mult = 1 + Math.min(3, Math.floor(P.combo / 4)); P.score += 100 * mult;
+  toast(mult > 1 ? `Tagged! x${mult}` : 'Tagged!');
+  if (link) link.send({ t: 'buzz', ms: 25 });
+}
+
+// ------------------------------------------------------------ HUD
+let toastT = 0;
+function toast(s){ $('toast').textContent = s; $('toast').classList.add('show'); toastT = 1.6; }
+function banner(s, t){ $('banner').textContent = s; $('banner').classList.add('show'); setTimeout(() => $('banner').classList.remove('show'), (t || 1.2) * 1000); }
+function shieldsUI(){ $('shields').innerHTML = Array.from({ length: VEST }, (_, i) => `<i class="${i < P.vest ? '' : 'off'}"></i>`).join(''); }
+function hud(){
+  $('scoreV').textContent = P.score.toLocaleString(); $('tagsV').textContent = P.tags;
+  const s = Math.ceil(timeLeft); $('timeV').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  const r = $('reticle'); r.style.left = ((Ctrl.aimX + 1) / 2 * innerWidth) + 'px'; r.style.top = ((1 - Ctrl.aimY) / 2 * innerHeight) + 'px';
+}
+shieldsUI();
+
+// ------------------------------------------------------------ flow
+function padUrl(){ const here = location.protocol === 'https:' ? new URL('pad.html', location.href).href : PAD_HOME; return here + '#' + code; }
+function showPair(){ $('code').textContent = code;
+  try { const qr = qrcode(0, 'M'); qr.addData(padUrl()); qr.make(); $('qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch (_) { $('qr').textContent = code; } }
+function startLink(){
+  if (link) link.close();
+  link = ClayLink.host(code, (m, from) => onPhone(m, (m && m.pid) || from || 'local'), s => {
+    if (s === 'taken'){ code = ClayLink.newCode(); showPair(); startLink(); }
+    if (s === 'offline') toast('No internet, so phones cannot join. Mouse and keys still work.');
+  });
+}
+function startRound(){
+  Snd.init(); Snd.start();
+  for (const b of bots){ scene.remove(b.fig); if (b.sight) scene.remove(b.sight); b.spot.busy = false; } bots.length = 0;
+  for (const b of bolts) scene.remove(b.m); bolts.length = 0;
+  Object.assign(P, { x: 0, z: 11, yaw: 0, vest: VEST, recharge: 0, score: 0, tags: 0, combo: 0, best: 0, hitsTaken: 0 });
+  shieldsUI(); timeLeft = ROUND; mode = 'play';
+  $('pair').classList.remove('big'); $('end').hidden = true; $('reticle').hidden = false;
+  $('help').hidden = !!(Ctrl.aimPhone); banner('Go!', 0.9);
+  if (link) link.send({ t: 'hi', game: 'lasertag' });
+  Ctrl.fireCount = 0;
+}
+function endRound(){
+  mode = 'end'; $('reticle').hidden = true; $('end').hidden = false; $('help').hidden = true;
+  $('endScore').textContent = P.score.toLocaleString();
+  $('endNote').textContent = `${P.tags} tags, best streak ${P.best}, tagged ${P.hitsTaken} times`;
+  for (const b of bots) if (b.sight){ scene.remove(b.sight); b.sight = null; }
+}
+$('startBtn').addEventListener('click', startRound);
+$('mouseBtn').addEventListener('click', () => { Ctrl.mouse = true; startRound(); $('help').hidden = false; });
+$('againBtn').addEventListener('click', startRound);
+$('backBtn').addEventListener('click', () => { location.href = 'index.html'; });
+showPair(); startLink();
+
+// ------------------------------------------------------------ main loop
+let last = performance.now(), phoneT = 0;
+function step(dt){
+  phoneT -= dt; if (phoneT <= 0){ phoneT = 0.5; setPhones(); }
+  if (toastT > 0){ toastT -= dt; if (toastT <= 0) $('toast').classList.remove('show'); }
+  if (mode === 'play'){
+    timeLeft -= dt; if (timeLeft <= 0){ timeLeft = 0; endRound(); hud(); renderer.render(scene, cam); return; }
+    if (P.recharge > 0) P.recharge -= dt;
+    // moving: board lean, or keys
+    const k = Ctrl.keys, boardLive = Ctrl.boardPhone && performance.now() / 1000 - Ctrl.lastBoard < 2.5;
+    let fwd = boardLive ? Ctrl.fwd : 0, side = boardLive ? Ctrl.side : 0;
+    if (k.w || k.arrowup) fwd = 1; if (k.s || k.arrowdown) fwd = -1; if (k.a || k.arrowleft) side = -1; if (k.d || k.arrowright) side = 1;
+    const sp = 3.4 * dt, sx = Math.sin(P.yaw), cz = Math.cos(P.yaw);
+    const nx = P.x + (-sx * fwd + cz * side) * sp, nz = P.z + (-cz * fwd - sx * side) * sp;
+    if (!blocked(nx, P.z, 0.4)) P.x = nx; if (!blocked(P.x, nz, 0.4)) P.z = nz;
+    // turning: aim near the edge of the screen
+    const edge = Math.abs(Ctrl.aimX) - 0.72; if (edge > 0) P.yaw -= Math.sign(Ctrl.aimX) * edge / 0.3 * 1.5 * dt;
+    // shots and opponents
+    let n = Ctrl.fireCount; Ctrl.fireCount = 0; while (n-- > 0) shoot();
+    const want = timeLeft > ROUND - 20 ? 2 : 4; if (bots.filter(b => !b.dead).length < want && Math.random() < dt * 1.5) spawnBot();
+    for (const b of bots) if (!b.dead) botFrame(b, dt);
+    for (let i = bots.length - 1; i >= 0; i--) if (bots[i].dead) bots.splice(i, 1);
+  } else { Ctrl.fireCount = 0; }
+  for (const b of bolts) if (!b.dead) boltFrame(b, dt);
+  for (let i = bolts.length - 1; i >= 0; i--) if (bolts[i].dead) bolts.splice(i, 1);
+  for (const b of beams){ b.t -= dt; b.l.material.opacity = Math.max(0, b.t / 0.14); if (b.t <= 0){ scene.remove(b.l); b.dead = true; } }
+  for (let i = beams.length - 1; i >= 0; i--) if (beams[i].dead) beams.splice(i, 1);
+  // camera: eye height with a little walk bob; slow drift on the pairing screen
+  if (mode === 'pair'){ P.yaw = Math.sin(performance.now() / 4000) * 0.35; }
+  cam.position.set(P.x, 1.55, P.z); cam.rotation.set(0, P.yaw, 0, 'YXZ');
+  // reticle turns pink over a target
+  ray.setFromCamera({ x: Ctrl.aimX, y: Ctrl.aimY }, cam);
+  const over = ray.intersectObjects(bots.filter(b => b.state !== 'down').map(b => b.fig), true).length > 0;
+  $('reticle').classList.toggle('over', over);
+  hud();
+  renderer.render(scene, cam);
+}
+function loop(now){ const dt = Math.min(0.05, (now - last) / 1000); last = now; step(dt); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+window.__lt = { P, Ctrl, bots, bolts, onPhone, startRound, step, cam, get mode(){ return mode; }, set time(v){ timeLeft = v; } };
+})();
+</script>
+</body></html>

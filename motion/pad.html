@@ -39,6 +39,16 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 #trigger small{ font-family:var(--body); font-size:13px; color:var(--dim) }
 #trigger.down{ transform:scale(.985); border-color:var(--pink); background:radial-gradient(circle at 50% 45%, #5a1b52 0%, var(--panel) 70%) }
 .row{ display:flex; gap:10px } .row button{ flex:1 }
+[hidden]{ display:none !important }
+.roles{ display:flex; gap:10px }
+.roles button{ flex:1; background:transparent; color:var(--fg); border:2px solid var(--line); display:flex; flex-direction:column; gap:2px; align-items:center }
+.roles button small{ font-weight:400; font-size:12px; color:var(--dim) }
+.roles button[aria-pressed="true"]{ border-color:var(--mint); background:rgba(92,242,207,.12) }
+#board{ flex:1; min-height:180px; border-radius:22px; border:2px solid var(--line); background:var(--panel); position:relative; overflow:hidden }
+#board::before, #board::after{ content:""; position:absolute; background:var(--line) }
+#board::before{ left:50%; top:10%; bottom:10%; width:2px }
+#board::after{ top:50%; left:10%; right:10%; height:2px }
+#dot{ position:absolute; left:50%; top:50%; width:44px; height:44px; margin:-22px; border-radius:50%; background:var(--mint); box-shadow:0 0 18px var(--mint); transition:transform .05s linear }
 .err{ color:var(--amber); font-size:14px; margin:0 }
 </style>
 </head><body>
@@ -48,6 +58,10 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
   <h1>Turn this phone into the controller</h1>
   <p>Type the four letters showing on the TV or laptop, then tap Connect. Your phone will ask to use motion. Allow it.</p>
   <div class="code"><input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" aria-label="Room code"></div>
+  <div class="roles" role="group" aria-label="What this phone does">
+    <button id="roleAim" aria-pressed="true">Controller<small>aim, swing and fire</small></button>
+    <button id="roleBoard" aria-pressed="false">Board<small>Laser Tag: lay flat, lean to move</small></button>
+  </div>
   <button id="go">Connect</button>
   <p id="err" class="err" hidden></p>
 </section>
@@ -57,8 +71,9 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
   <div id="who" class="who">Joining</div>
   <p id="modeTip" class="tip">Point the top of the phone at the screen and tap Center. Put the blade in the glowing ring where each bolt will land.</p>
   <div id="trigger" role="button" aria-label="Trigger">Trigger<small>tap to fire, hold to keep firing</small></div>
+  <div id="board" hidden aria-hidden="true"><div id="dot"></div></div>
   <div class="row"><button id="center" class="ghost">Center</button><button id="leave" class="ghost">Leave</button></div>
-  <p class="tip">Point the top of the phone at the screen and tap Center whenever your aim drifts.</p>
+  <p id="centerTip" class="tip">Point the top of the phone at the screen and tap Center whenever your aim drifts.</p>
 </section>
 
 <script src="lib/peerjs.min.js"></script>
@@ -71,13 +86,17 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
   let pid = ''; try { pid = sessionStorage.getItem('chPid') || ''; } catch (_) {}
   if (!pid){ pid = Math.random().toString(36).slice(2, 10); try { sessionStorage.setItem('chPid', pid); } catch (_) {} }
   const PC = ['#5cf2cf', '#ff4fa8'];
-  let link = null, q = [0,0,0,1], rr = 0, fire = 0, rc = 0, held = false, gotOri = false, sent = 0, wake = null;
+  let link = null, q = [0,0,0,1], rr = 0, fire = 0, rc = 0, held = false, gotOri = false, sent = 0, wake = null, beta = 0, gamma = 0, role = 'aim';
   const TIPS = {
     saber: ['Saber', 'Point the top of the phone at the screen and tap Center: that holds the blade up. Tilt to put the blade in the glowing ring where each bolt will land. Stay smooth, wild swinging overheats the blade.'],
     blaster: ['Blaster', 'Hold the phone like a blaster, top of the phone pointing at the screen. Aim at the targets and tap the trigger.'],
+    lasertag: ['Laser Tag', 'Point the top of the phone at the screen and tap to tag. Aim at the edge of the screen to turn around.'],
     menu: ['Pick a game', 'Point the top of the phone at a game on the screen and tap the trigger to choose it.']
   };
-  try { const h = ClayLink.cleanCode(location.hash.slice(1)); if (h) codeIn.value = h; } catch (_) {}
+  function setRole(r){ role = r; $('roleAim').setAttribute('aria-pressed', r === 'aim'); $('roleBoard').setAttribute('aria-pressed', r === 'board'); }
+  $('roleAim').addEventListener('click', () => setRole('aim'));
+  $('roleBoard').addEventListener('click', () => setRole('board'));
+  try { const raw = location.hash.slice(1); const h = ClayLink.cleanCode(raw.split('-')[0]); if (h) codeIn.value = h; if (/board/i.test(raw)) setRole('board'); } catch (_) {}
   function status(text, cls){ pill.textContent = text; pill.className = 'pill' + (cls ? ' ' + cls : ''); }
   function err(msg){ const e = $('err'); e.textContent = msg; e.hidden = !msg; }
 
@@ -85,6 +104,8 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
   const D2R = Math.PI / 180;
   function onOri(e){
     if (e.alpha == null) return;
+    beta = e.beta || 0; gamma = e.gamma || 0;
+    if (role === 'board'){ const dx = Math.max(-1, Math.min(1, gamma / 15)), dy = Math.max(-1, Math.min(1, -beta / 15)); $('dot').style.transform = `translate(${dx * 90}px, ${-dy * 90}px)`; }
     const x = (e.beta || 0) * D2R, y = (e.gamma || 0) * D2R, z = e.alpha * D2R;
     const cX = Math.cos(x/2), cY = Math.cos(y/2), cZ = Math.cos(z/2), sX = Math.sin(x/2), sY = Math.sin(y/2), sZ = Math.sin(z/2);
     q = [ sX*cY*cZ - cX*sY*sZ, cX*sY*cZ + sX*cY*sZ, cX*cY*sZ + sX*sY*cZ, cX*cY*cZ - sX*sY*sZ ];
@@ -109,7 +130,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
 
   function onMsg(d){
     if (!d) return;
-    if (d.t === 'hi' && TIPS[d.game]) { $('modeName').textContent = TIPS[d.game][0]; $('modeTip').textContent = TIPS[d.game][1]; }
+    if (d.t === 'hi' && TIPS[d.game] && role === 'aim') { $('modeName').textContent = TIPS[d.game][0]; $('modeTip').textContent = TIPS[d.game][1]; }
     if (d.t === 'hi' && d.slots && d.slots[pid] !== undefined) setPlayer(d.slots[pid]);
     if (d.t === 'full' && d.pid === pid) status('Game full: two players already in', 'warn');
     if (d.t === 'buzz' && (!d.pid || d.pid === pid) && navigator.vibrate) { try { navigator.vibrate(Math.min(80, d.ms || 20)); } catch (_) {} }
@@ -132,9 +153,11 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
     const ok = await askMotion();
     if (!ok) { err('Motion is off for this page. On iPhone, close the tab, open it again and tap Allow when asked.'); return; }
     keepAwake();
-    try { history.replaceState(null, '', '#' + code); } catch (_) {}
+    try { history.replaceState(null, '', '#' + code + (role === 'board' ? '-board' : '')); } catch (_) {}
     link = ClayLink.join(code, onMsg, onStatus);
     $('join').hidden = true; $('play').hidden = false;
+    const board = role === 'board'; $('trigger').hidden = board; $('board').hidden = !board;
+    if (board){ $('modeName').textContent = 'Board'; $('modeTip').textContent = 'Lay this phone flat on the balance board, top of the phone pointing at the TV. Lean forward to move, lean back to back up, lean sideways to step sideways.'; $('centerTip').textContent = 'Stand level and tap Center if you drift when standing still.'; }
     setTimeout(() => { if (!gotOri) err('This phone is not sending motion. Try another browser, or check that motion is allowed in settings.'); }, 2500);
   });
   codeIn.addEventListener('keydown', e => { if (e.key === 'Enter') $('go').click(); });
@@ -150,7 +173,7 @@ button:focus-visible{ outline:3px solid var(--pink); outline-offset:2px }
   let last = performance.now(), n = 0;
   setInterval(() => {
     if (!link) return;
-    link.send({ t: 'm', pid, q, rr: Math.round(rr), ts: Date.now(), fire, held: held ? 1 : 0, rc });
+    link.send({ t: 'm', pid, role, q, b: Math.round(beta * 10) / 10, g: Math.round(gamma * 10) / 10, rr: Math.round(rr), ts: Date.now(), fire, held: held ? 1 : 0, rc });
     n++; const now = performance.now(); if (now - last > 1000) { $('rate').textContent = gotOri ? n + ' updates/s' : 'no motion yet'; n = 0; last = now; }
   }, 16);
 })();
