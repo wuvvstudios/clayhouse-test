@@ -322,7 +322,8 @@ function menuFrame(dt){
   for (const p of [pSaber, pBlast]){ const hi = lit.has(p); if (hi !== p.userData.hi){ p.userData.hi = hi; p.userData.draw(hi); if (hi) Snd.tick(); } p.scale.setScalar(p.scale.x + ((hi ? 1.06 : 1) - p.scale.x) * 0.2); }
   if (pick){ Snd.init(); Snd.pick(); startGame(pick === pSaber ? 'saber' : 'blaster'); }
 }
-function toMenu(){ stopGames(); mode = 'menu'; $('pair').classList.add('corner'); menu.visible = true; $('end').hidden = true; $('stats').hidden = true; $('gameName').innerHTML = 'Clay<b>house</b> Motion';
+const WANT = /^#(saber|blaster)$/.test(location.hash) ? location.hash.slice(1) : null; let wantUsed = false;   // opened from a box on the home screen
+function toMenu(){ if (WANT && !wantUsed && mode === 'pair'){ wantUsed = true; startGame(WANT); return; } stopGames(); mode = 'menu'; $('pair').classList.add('corner'); menu.visible = true; $('end').hidden = true; $('stats').hidden = true; $('gameName').innerHTML = 'Clay<b>house</b> Motion';
   setPhoneState(); sayHi(); takeFire(); }
 
 // ---------------------------------------------------------------- shared round state: a score and combo for each player
