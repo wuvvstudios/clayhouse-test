@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2B5A97">
+<title>Clayhouse Aux</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Take the aux: search YouTube on your phone, the TV plays it */
+:root{ --ink:#1B1B1B; --cream:#F3E6C8; --cream2:#FFF4DA; --gold:#F6C343; --rust:#B5541E; --red:#D8402B; --blue:#2B5A97; --disp:'Bungee',Impact,sans-serif; --ui:'Oswald','Arial Narrow',sans-serif }
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent }
+[hidden]{ display:none !important }
+html,body{ margin:0; min-height:100%; color:var(--cream); font-family:var(--ui);
+  background:radial-gradient(ellipse at 45% 40%,rgba(0,0,0,0) 55%,rgba(5,10,30,.45) 100%),repeating-conic-gradient(from 0deg at 18% 78%,rgba(255,240,200,.07) 0deg 7deg,rgba(0,0,0,0) 7deg 14deg),var(--blue); background-attachment:fixed }
+body{ padding:max(12px,env(safe-area-inset-top)) 14px max(20px,env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:12px }
+.h{ font-family:var(--disp); font-weight:400; color:var(--gold); -webkit-text-stroke:1px var(--ink); text-shadow:1px 1px 0 var(--rust),2px 2px 0 var(--rust),3px 3px 0 var(--ink); margin:0; line-height:1; font-size:26px }
+header{ display:flex; align-items:center; gap:10px } header .h{ flex:1 }
+.chip{ font-family:var(--disp); font-size:12px; padding:6px 10px; border-radius:999px; border:3px solid var(--ink); background:var(--cream); color:var(--ink); box-shadow:3px 3px 0 var(--ink) }
+.panel{ background:var(--cream); color:var(--ink); border:3px solid var(--ink); border-radius:18px; box-shadow:5px 5px 0 var(--ink); padding:14px }
+button{ font-family:var(--disp); font-size:16px; color:var(--ink); background:var(--cream); border:3px solid var(--ink); border-radius:999px; box-shadow:3px 3px 0 var(--ink); padding:12px 16px; cursor:pointer }
+button:active{ transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink) }
+button.red{ background:var(--red); color:var(--cream) } button.gold{ background:var(--gold) }
+input{ font-family:var(--ui); font-size:20px; padding:12px 14px; border:3px solid var(--ink); border-radius:14px; background:#fff; color:var(--ink); width:100%; min-width:0 }
+#code{ font-family:var(--disp); letter-spacing:.3em; text-transform:uppercase; text-align:center; font-size:30px }
+#join{ display:flex; flex-direction:column; gap:12px; margin-top:8vh } #join h2{ font-family:var(--disp); font-weight:400; margin:0; font-size:24px } #join p{ margin:0; font-size:17px }
+#now{ display:flex; gap:12px; align-items:center }
+#now img{ width:96px; height:72px; object-fit:cover; border-radius:10px; border:2px solid var(--ink); flex-shrink:0; background:#000 }
+#now .w{ flex:1; min-width:0 } #now small{ font-size:13px; opacity:.75; display:block } #now b{ font-family:var(--disp); font-weight:400; font-size:16px; line-height:1.15; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+.bar{ height:6px; border-radius:4px; background:rgba(27,27,27,.15); overflow:hidden; margin-top:6px } .bar i{ display:block; height:100%; width:0; background:var(--red); transition:width 1s linear }
+.ctl{ display:flex; gap:10px; margin-top:12px } .ctl button{ flex:1 }
+form{ display:flex; gap:8px } form button{ flex-shrink:0 }
+.list{ display:flex; flex-direction:column; gap:10px }
+.item{ display:flex; gap:10px; align-items:center; background:var(--cream2); color:var(--ink); border:3px solid var(--ink); border-radius:14px; padding:8px; box-shadow:3px 3px 0 var(--ink) }
+.item img{ width:84px; height:63px; object-fit:cover; border-radius:8px; border:2px solid var(--ink); flex-shrink:0; background:#000 }
+.item .w{ flex:1; min-width:0 } .item b{ font-size:15px; line-height:1.2; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden } .item small{ font-size:12px; opacity:.7 }
+.item .bs{ display:flex; flex-direction:column; gap:6px } .item .bs button{ font-size:12px; padding:8px 10px; white-space:nowrap }
+.sec{ font-family:var(--disp); font-size:15px; color:var(--cream); text-shadow:2px 2px 0 var(--ink); margin:4px 2px 0 }
+#msg{ text-align:center; font-family:var(--disp); font-size:16px; min-height:20px; color:var(--gold); -webkit-text-stroke:.8px var(--ink); text-shadow:2px 2px 0 var(--ink) }
+</style>
+</head><body>
+<header><h1 class="h">Take the aux</h1><span class="chip" id="link">Not connected</span></header>
+<section id="join" class="panel">
+  <h2>Play your music on the TV</h2>
+  <p>Type the aux code from the corner of the TV.</p>
+  <input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Aux code">
+  <input id="name" maxlength="12" placeholder="Your name" autocomplete="off" aria-label="Your name">
+  <button id="go" class="red">Connect</button>
+</section>
+<section id="main" hidden style="display:flex;flex-direction:column;gap:12px">
+  <div class="panel" id="nowP">
+    <div id="now"><img id="nowImg" alt=""><div class="w"><small id="nowBy">Nothing playing</small><b id="nowT">Search for a song below</b><div class="bar"><i id="bar"></i></div></div></div>
+    <div class="ctl"><button id="pp">Pause</button><button id="skip">Skip</button></div>
+  </div>
+  <div id="msg"></div>
+  <form id="sf"><input id="q" placeholder="Search a song or artist" autocomplete="off" enterkeyhint="search" aria-label="Search"><button class="gold">Search</button></form>
+  <div class="sec" id="resH" hidden>Results</div>
+  <div class="list" id="res"></div>
+  <div class="sec" id="queueH" hidden>Up next</div>
+  <div class="list" id="queue"></div>
+</section>
+<script src="lib/peerjs.min.js"></script>
+<script src="lib/mqtt.min.js?v=5"></script>
+<script src="link.js?v=5"></script>
+<script>
+(() => {
+'use strict';
+// a browser key for YouTube search, locked in Google Cloud to this website and to the YouTube Data API only
+const KEY = 'AIzaSyDwQMixm9U7XBwj9ZjVC_1ktimKTjSt1fA';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const unent = s => { const t = document.createElement('textarea'); t.innerHTML = s; return t.value; };
+let pid = ''; try { pid = sessionStorage.getItem('axPid') || ''; } catch (_) {}
+if (!pid){ pid = Math.random().toString(36).slice(2, 10); try { sessionStorage.setItem('axPid', pid); } catch (_) {} }
+let name = ''; try { name = localStorage.getItem('csName') || ''; } catch (_) {}
+let link = null, S = null, actId = 0, outbox = null, lastSt = 0, results = [];
+try { actId = +(sessionStorage.getItem('axAct') || 0); } catch (_) {}
+$('name').value = name;
+try { const h = ClayLink.cleanCode(location.hash.slice(1)); if (h) $('code').value = h; } catch (_) {}
+
+function connect(){
+  const code = ClayLink.cleanCode($('code').value); if (code.length !== 4){ $('code').focus(); return; }
+  name = $('name').value.trim().slice(0, 12) || 'Someone'; try { localStorage.setItem('csName', name); } catch (_) {}
+  if (link) link.close();
+  link = ClayLink.join(code, onMsg, s => { $('link').textContent = s === 'direct' || s === 'relay' ? 'Connected' : s === 'nohost' ? 'No TV found' : 'Connecting'; });
+  $('join').hidden = true; $('main').hidden = false; $('q').focus();
+}
+$('go').onclick = connect;
+$('code').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
+if ($('code').value.length === 4 && name) connect();
+
+function act(o){ actId++; try { sessionStorage.setItem('axAct', actId); } catch (_) {} outbox = Object.assign({ t: 'ax-act', p: pid, id: actId, by: name }, o); link && link.send(outbox); }
+setInterval(() => { if (outbox && link) link.send(outbox); if (link && performance.now() - lastSt > 4000) $('link').textContent = 'Connecting'; }, 800);
+
+function onMsg(m){
+  if (!m || m.t !== 'ax-st') return;
+  lastSt = performance.now(); $('link').textContent = 'Connected';
+  if (outbox && m.ack && (m.ack[pid] || 0) >= outbox.id) outbox = null;
+  S = m; draw();
+}
+function draw(){
+  const cur = S.q[0];
+  $('nowImg').src = cur ? (cur.th || 'https://i.ytimg.com/vi/' + cur.v + '/mqdefault.jpg') : '';
+  $('nowImg').style.visibility = cur ? 'visible' : 'hidden';
+  $('nowBy').textContent = cur ? (S.paused ? 'Paused' : 'Now playing') + (cur.by ? ' · ' + cur.by + ' has the aux' : '') : 'Nothing playing';
+  $('nowT').textContent = cur ? cur.t : 'Search for a song below';
+  $('bar').style.width = cur && S.dur ? Math.min(100, S.pos / S.dur * 100) + '%' : '0';
+  $('pp').textContent = S.paused ? 'Play' : 'Pause'; $('pp').disabled = !cur; $('skip').disabled = !cur;
+  $('msg').textContent = S.msg || '';
+  const up = S.q.slice(1);
+  $('queueH').hidden = !up.length;
+  $('queue').innerHTML = up.map((s, k) => `<div class="item"><img src="${esc(s.th || 'https://i.ytimg.com/vi/' + s.v + '/mqdefault.jpg')}" alt=""><div class="w"><b>${esc(s.t)}</b><small>${esc(s.by || '')}</small></div>`
+    + `<div class="bs">${k ? `<button data-up="${k + 1}">Play next</button>` : ''}<button data-del="${k + 1}">Remove</button></div></div>`).join('');
+}
+$('pp').onclick = () => { if (S) act({ a: S.paused ? 'play' : 'pause' }); };
+$('skip').onclick = () => act({ a: 'skip' });
+$('queue').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.del) act({ a: 'del', i: +b.dataset.del }); if (b.dataset.up) act({ a: 'up', i: +b.dataset.up }); });
+
+$('sf').addEventListener('submit', async e => {
+  e.preventDefault();
+  const q = $('q').value.trim(); if (!q) return;
+  $('q').blur(); $('resH').hidden = false; $('resH').textContent = 'Searching';
+  try {
+    const u = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=12&safeSearch=moderate&q=' + encodeURIComponent(q) + '&key=' + KEY;
+    const r = await fetch(u); const j = await r.json();
+    if (j.error){ $('resH').textContent = /quota/i.test(j.error.message || '') ? "Search is out of tries for today. Try again tomorrow." : "Search didn't work: " + (j.error.message || 'try again'); $('res').innerHTML = ''; return; }
+    results = (j.items || []).filter(x => x.id && x.id.videoId).map(x => ({ id: x.id.videoId, t: unent(x.snippet.title), ch: unent(x.snippet.channelTitle), th: (x.snippet.thumbnails.medium || x.snippet.thumbnails.default || {}).url || '' }));
+    $('resH').textContent = results.length ? 'Results' : 'Nothing found';
+    $('res').innerHTML = results.map((s, k) => `<div class="item"><img src="${esc(s.th)}" alt=""><div class="w"><b>${esc(s.t)}</b><small>${esc(s.ch)}</small></div><div class="bs"><button class="red" data-now="${k}">Play now</button><button data-add="${k}">Queue</button></div></div>`).join('');
+  } catch (_) { $('resH').textContent = "Search didn't work. Check your connection."; }
+});
+$('res').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const k = +(b.dataset.now ?? b.dataset.add), s = results[k]; if (!s) return;
+  act({ a: b.dataset.now != null ? 'now' : 'add', v: { id: s.id, t: s.t, th: s.th } });
+  b.textContent = b.dataset.now != null ? 'Playing' : 'Queued'; b.disabled = true;
+  try { navigator.vibrate && navigator.vibrate(15); } catch (_) {}
+});
+})();
+</script>
+</body></html>
