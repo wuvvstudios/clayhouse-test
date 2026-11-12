@@ -3260,6 +3260,8 @@ show('pick');
 #vh .cardlid{transform:rotateX(90deg);transition:transform .55s cubic-bezier(.2,.8,.2,1)}
 #vh .cardlid.popped{transform:rotateX(-14deg);opacity:1}
 #vh .pack.cardbox .pack-body{box-shadow:inset 0 -5px 0 rgba(0,0,0,0.14),inset 0 2px 0 rgba(255,255,255,0.35),-30px 40px 56px -24px rgba(30,34,90,0.6)}
+#vh .phonelid{transform:translateZ(3px);transition:transform .9s cubic-bezier(.25,.8,.25,1),opacity .5s ease .4s}
+#vh .phonelid.popped{transform:translateZ(60px) translateY(-560px) rotateX(-8deg);opacity:0}
 /* Vintage theme for the rest of the Arcade: the same toy-box look as the home screen (sunburst blue, cream cards with
    black outlines and hard shadows, gold Bungee headings, a red primary button) */
 :root{
@@ -3337,11 +3339,11 @@ html body .moves b{color:var(--vt-red)}
   const GAMES = [
     { id: 'bowling', title: 'Bowling', cat: 'Sports', color: '#E57A33', tray: '#2F5E9E', key: 'bowling', hero: 'bowlRelease', exit: ['bowlBack', 'bowlBack', 'bowlRelease', 'bowlRelease', 'bowlRelease', 'runA', 'runB', 'runA', 'runB', 'runA'],
       blurb: 'Step up, swing your arm and let it roll. The camera reads your throw, so the curve is all you.' },
-    { page: 'index.html#saber', title: 'Saber', cat: 'Action', color: '#2D68B0', tray: '#C0443A', key: 'saber', hero: 'saberUp', input: 'Phone', players: '1–2', exit: ['saberUp', 'saberSlash', 'saberSlash', 'saberUp', 'saberSlash', 'saberSlash', 'runA', 'runB', 'runA', 'runB'],
+    { page: 'index.html#saber', box: 'phone', title: 'Saber', cat: 'Action', color: '#2D68B0', tray: '#C0443A', key: 'saber', hero: 'saberUp', input: 'Phone', players: '1–2', exit: ['saberUp', 'saberSlash', 'saberSlash', 'saberUp', 'saberSlash', 'saberSlash', 'runA', 'runB', 'runA', 'runB'],
       blurb: 'Your phone becomes the hilt. Training drones fire bolts at you, and you knock them back.' },
-    { page: 'index.html#blaster', title: 'Blaster Run', cat: 'Action', color: '#D35A86', tray: '#2F5E9E', key: 'blaster', hero: 'aim', input: 'Phone', players: '1–2', exit: ['aim', 'recoil', 'aim', 'recoil', 'aim', 'recoil', 'runA', 'runB', 'runA', 'runB'],
+    { page: 'index.html#blaster', box: 'phone', title: 'Blaster Run', cat: 'Action', color: '#D35A86', tray: '#2F5E9E', key: 'blaster', hero: 'aim', input: 'Phone', players: '1–2', exit: ['aim', 'recoil', 'aim', 'recoil', 'aim', 'recoil', 'runA', 'runB', 'runA', 'runB'],
       blurb: 'Pop-up targets and drones across the station. Ride from area to area like an arcade rail shooter.' },
-    { page: 'lasertag.html', title: 'Laser Tag', cat: 'Action', color: '#25919B', tray: '#C0443A', key: 'lasertag', hero: 'crouchAim', input: 'Phone + board', players: '1', exit: ['crouchAim', 'crouchShot', 'crouchAim', 'crouchShot', 'runA', 'runB', 'crouchAim', 'crouchShot', 'runA', 'runB'],
+    { page: 'lasertag.html', box: 'phone', title: 'Laser Tag', cat: 'Action', color: '#25919B', tray: '#C0443A', key: 'lasertag', hero: 'crouchAim', input: 'Phone + board', players: '1', exit: ['crouchAim', 'crouchShot', 'crouchAim', 'crouchShot', 'runA', 'runB', 'crouchAim', 'crouchShot', 'runA', 'runB'],
       blurb: 'Aim with one phone, lean on the board to move, and tag the bots before they tag your vest.' },
     { id: 'dance-battle', title: 'Dance Battle', cat: 'Party', color: '#6A4FB0', tray: '#E0A93A', key: 'dance', hero: 'danceA', exit: ['danceA', 'danceA', 'danceB', 'danceB', 'danceA', 'danceA', 'danceB', 'danceB', 'danceA', 'danceB'],
       blurb: 'Watch the clip, practice for a moment, then nail the official take from memory.' },
@@ -3462,7 +3464,63 @@ html body .moves b{color:var(--vt-red)}
       </div>
     </button>`;
   };
+  // ---------- phone-controller games come in a lift-off phone box: our own phone drawn on the lid, the game on its screen ----------
+  const screenArt = g => g.page === 'index.html#saber'
+      ? `<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 60%,#1d3f8a,#081430 70%)"></div>
+         ${[[22, 26], [70, 18], [58, 62]].map(([x, y]) => `<div style="position:absolute;left:${x}%;top:${y}%;width:16px;height:16px;margin:-8px;border-radius:50%;background:#bfe9ff;box-shadow:0 0 10px 4px #5ec8ff"></div>`).join('')}
+         <div style="position:absolute;left:50%;top:14%;width:9px;height:62%;margin-left:-4px;border-radius:6px;background:#fff;box-shadow:0 0 10px 4px #5ec8ff,0 0 24px 10px rgba(94,200,255,.6);transform:rotate(22deg);transform-origin:50% 100%"></div>
+         <div style="position:absolute;left:50%;top:72%;width:16px;height:22%;margin-left:-8px;border-radius:4px;background:linear-gradient(90deg,#555,#bbb,#555);border:2px solid #1B1B1B;transform:rotate(22deg);transform-origin:50% 0"></div>`
+    : g.page === 'index.html#blaster'
+      ? `<div style="position:absolute;inset:0;background:linear-gradient(180deg,#ff8ab5,#d35a86 60%,#7a2449)"></div>
+         ${[[30, 30, 34], [72, 46, 26], [42, 70, 22]].map(([x, y, r]) => `<div style="position:absolute;left:${x}%;top:${y}%;width:${r}px;height:${r}px;margin:-${r / 2}px;border-radius:50%;background:repeating-radial-gradient(circle,#FFF4DA 0 3px,#D8402B 3px 6px);border:2px solid #1B1B1B"></div>`).join('')}
+         <div style="position:absolute;left:50%;top:46%;width:64px;height:64px;margin:-32px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 8px #fff"></div>
+         <div style="position:absolute;left:50%;top:46%;width:86px;height:3px;margin:-1.5px -43px;background:#fff"></div><div style="position:absolute;left:50%;top:46%;width:3px;height:86px;margin:-43px -1.5px;background:#fff"></div>`
+      : `<div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 46%,#123a3e,#04161a 75%)"></div>
+         <div style="position:absolute;left:-10%;top:28%;width:120%;height:3px;background:#ff3b3b;box-shadow:0 0 8px 2px #ff3b3b;transform:rotate(-14deg)"></div>
+         <div style="position:absolute;left:-10%;top:62%;width:120%;height:3px;background:#5cf2cf;box-shadow:0 0 8px 2px #5cf2cf;transform:rotate(9deg)"></div>
+         <div style="position:absolute;left:50%;top:46%;width:78px;height:78px;margin:-39px;border-radius:50%;border:3px solid #5cf2cf;box-shadow:0 0 10px #5cf2cf,inset 0 0 10px #5cf2cf"></div>
+         <div style="position:absolute;left:50%;top:46%;width:8px;height:8px;margin:-4px;border-radius:50%;background:#ff3b3b;box-shadow:0 0 8px #ff3b3b"></div>`;
+  // our own phone: chunky rounded body, a pill speaker, one camera dot, a side button
+  const phoneArt = (g, w) => { const h = w * 2.05; return `<div style="position:relative;width:${w}px;height:${h}px;border-radius:${w * 0.2}px;background:linear-gradient(135deg,#3a3a44,#15151b);border:4px solid #1B1B1B;box-shadow:inset 0 0 0 3px #5a5a66,6px 8px 0 rgba(27,27,27,.45)">
+      <div style="position:absolute;right:-8px;top:${h * 0.22}px;width:5px;height:${h * 0.14}px;border-radius:3px;background:#1B1B1B"></div>
+      <div style="position:absolute;inset:${w * 0.07}px;top:${w * 0.16}px;bottom:${w * 0.1}px;border-radius:${w * 0.1}px;overflow:hidden;border:2px solid #000">${screenArt(g)}</div>
+      <div style="position:absolute;left:50%;top:${w * 0.055}px;width:${w * 0.26}px;height:${w * 0.05}px;margin-left:-${w * 0.13}px;border-radius:9px;background:#0a0a0e"></div>
+      <div style="position:absolute;left:calc(50% + ${w * 0.18}px);top:${w * 0.05}px;width:${w * 0.06}px;height:${w * 0.06}px;border-radius:50%;background:#26304a;box-shadow:inset 0 0 0 2px #0a0a0e"></div></div>`; };
+  const PDEPTH = 120;
+  const phoneBoxHTML = (g, i) => {
+    const edge = shade(g.color, 0.62), deep = shade(g.color, 0.48), ts = g.title.length > 10 ? 28 : 36;
+    return `<button class="pack phonebox" type="button" data-hand data-vh="${i}" aria-label="${esc(g.title)}">
+      <div class="lift">
+        <div aria-hidden="true" style="position:absolute;inset:0;border-radius:18px;background:${deep};transform:translateZ(-${PDEPTH}px)"></div>
+        <div class="cb-face" aria-hidden="true" style="right:-${PDEPTH}px;top:0;width:${PDEPTH}px;height:100%;border-radius:4px;transform-origin:0 50%;transform:rotateY(90deg);background:linear-gradient(90deg,${edge},${deep})">
+          <div style="position:absolute;inset:14px 12px;border:2px solid rgba(243,230,200,.45);border-radius:8px;display:flex;align-items:center;justify-content:center">
+            <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-family:'Bungee',sans-serif;font-size:26px;letter-spacing:3px;background:linear-gradient(180deg,#fff1b8,#d9a52e 45%,#fff1b8 55%,#b9861d);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(1px 1px 0 #1B1B1B);white-space:nowrap">${esc(g.title)}</div></div>
+          <div style="position:absolute;left:0;right:0;bottom:22px;text-align:center;font-family:'Bungee',sans-serif;font-size:10px;letter-spacing:2px;color:#F3E6C8">PHONE CONTROLLER</div><div class="wear" style="opacity:.7"></div></div>
+        <div class="cb-face" aria-hidden="true" style="left:0;top:-${PDEPTH}px;width:100%;height:${PDEPTH}px;transform-origin:50% 100%;transform:rotateX(90deg);background:linear-gradient(180deg,${deep},${edge})"><div class="wear" style="opacity:.6"></div></div>
+        <div class="cb-face" aria-hidden="true" style="left:0;bottom:-${PDEPTH}px;width:100%;height:${PDEPTH}px;transform-origin:50% 0;transform:rotateX(-90deg);background:${deep}"></div>
+        <div class="pack-body" style="background:radial-gradient(ellipse at 50% 40%,#2b2b33,#121216 75%);border-radius:18px;filter:none;transform:translateZ(-60px)">
+          <div aria-hidden="true" style="position:absolute;left:70px;top:46px;width:220px;height:420px;border-radius:44px;background:#0b0b0e;box-shadow:inset 0 10px 24px rgba(0,0,0,.8),0 0 0 3px rgba(255,255,255,.05)"></div>
+          <div style="position:absolute;left:0;right:0;bottom:12px;text-align:center;font-family:'Bungee',sans-serif;font-size:11px;letter-spacing:3px;color:rgba(243,230,200,.55)">LIFT TO PLAY</div>
+        </div>
+        <div class="bub" style="left:70px;top:46px;width:220px;height:420px">
+          <div class="fig" aria-hidden="true" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:translateZ(-46px);pointer-events:none;transition:transform .6s cubic-bezier(.2,.8,.2,1),opacity .4s ease">${phoneArt(g, 190)}</div>
+          <div class="pvwrap" style="position:absolute;inset:0;transform:translateZ(30px)" hidden><div class="pv" style="border-radius:40px;background:linear-gradient(160deg,${g.color},${shade(g.color, 0.55)})"><div class="pv-sun"></div>
+            <div style="position:absolute;left:0;right:0;bottom:24px;display:flex;justify-content:center"><span style="background:#1B1B1B;border:2px solid #F3E6C8;color:#F3E6C8;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:800;letter-spacing:2px">GRAB YOUR PHONE</span></div></div></div>
+          <div class="burst" aria-hidden="true" style="position:absolute;inset:0;transform:translateZ(44px);pointer-events:none" hidden></div>
+        </div>
+        <div class="bub-front phonelid cb-face" aria-hidden="true" style="left:0;top:0;width:100%;height:100%;border-radius:18px;border-width:4px;background:radial-gradient(ellipse at 50% 38%,rgba(255,244,218,.22),rgba(0,0,0,0) 60%),${g.color}">
+          <div style="position:absolute;inset:12px;border-radius:12px;border:2px solid rgba(243,230,200,.5)"></div>
+          <div style="position:absolute;left:0;right:0;top:30px;text-align:center;font-family:'Bungee',sans-serif;font-size:13px;letter-spacing:5px;color:${shade(g.color, 0.78)};text-shadow:1px 1px 0 rgba(255,255,255,.35),-1px -1px 0 rgba(0,0,0,.35)">CLAYHOUSE</div>
+          <div style="position:absolute;left:0;right:0;top:66px;display:flex;justify-content:center">${phoneArt(g, 142)}</div>
+          <div style="position:absolute;left:0;right:0;bottom:66px;text-align:center"><div style="display:inline-block;font-family:'Bungee',sans-serif;font-size:${ts}px;line-height:1;background:linear-gradient(180deg,#fff1b8,#e0ac32 45%,#fff1b8 55%,#b9861d);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(2px 2px 0 #1B1B1B)">${esc(g.title)}</div></div>
+          <div style="position:absolute;left:0;right:0;bottom:34px;text-align:center;font-size:11px;font-weight:800;letter-spacing:3px;color:#F3E6C8;text-shadow:1px 1px 0 #1B1B1B">YOUR PHONE IS THE CONTROLLER</div>
+          <div style="position:absolute;right:22px;top:22px;width:56px;height:56px;border-radius:50%;background:#F3E6C8;border:3px solid #1B1B1B;display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(10deg);color:#1B1B1B"><div style="font-family:'Bungee',sans-serif;font-size:14px;line-height:1">${esc(g.players)}</div><div style="font-size:8px;font-weight:800;letter-spacing:1px">PLAYERS</div></div>
+          <div class="wear" style="opacity:.75"></div></div>
+      </div>
+    </button>`;
+  };
   const packHTML = (g, i) => {
+    if (g.box === 'phone') return phoneBoxHTML(g, i);
     if (g.box === 'card') return cardBoxHTML(g, i);
     const edge = shade(g.color, 0.72), ts = g.title.length > 14 ? 22 : (g.title.length > 9 ? 26 : 32);
     return `<button class="pack" type="button" data-hand data-vh="${i}" aria-label="${esc(g.title)}">
@@ -3594,7 +3652,7 @@ html body .moves b{color:var(--vt-red)}
       el.style.transform = tf; el.style.zIndex = z; el.style.pointerEvents = ev; el.tabIndex = tab; el.classList.toggle('gone', op === 0);
       const ph = st.phase, out = me && (ph === 'burst' || ph === 'run' || ph === 'preview');
       const fg = el.querySelector('.fig');
-      if (LIST[i].box === 'card'){ fg.style.opacity = me && ph === 'preview' ? 0 : 1; fg.style.transform = out ? 'translateZ(14px) translateY(-150px) rotate(-6deg) scale(1.08)' : 'translateZ(14px)'; }
+      if (LIST[i].box){ fg.style.opacity = me && ph === 'preview' ? 0 : 1; const bz = LIST[i].box === 'phone' ? 'translateZ(-46px)' : 'translateZ(14px)'; fg.style.transform = out ? (LIST[i].box === 'phone' ? 'translateZ(70px) translateY(-30px) rotate(-4deg) scale(1.06)' : 'translateZ(14px) translateY(-150px) rotate(-6deg) scale(1.08)') : bz; }
       else fg.style.opacity = out ? 0 : 1;
       el.querySelector('.bub-front').classList.toggle('popped', !!(me && ph && ph !== 'fly'));
       const bu = el.querySelector('.burst'); if (me && ph === 'burst' && !LIST[i].box){ if (bu.hidden){ bu.innerHTML = shards; bu.hidden = false; } } else { bu.hidden = true; bu.innerHTML = ''; }
