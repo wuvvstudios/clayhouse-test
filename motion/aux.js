@@ -90,11 +90,13 @@
   function next(why){ S.q.shift(); S.pos = 0; S.paused = false; save(); sync(); beat(); }
 
   // the game's own soundtrack steps aside while aux is playing (sound effects keep going)
-  const media = new Set(), origPlay = HTMLMediaElement.prototype.play;
-  HTMLMediaElement.prototype.play = function(){ media.add(this); if (window.__clayAuxOn) return Promise.resolve(); return origPlay.apply(this, arguments); };
+  // only music players step aside: never the camera feed or any video (those are <video> elements or carry a live stream)
+  const isMusic = el => el instanceof HTMLAudioElement && !el.srcObject;
+  const media = new Set(), origPlay = HTMLAudioElement.prototype.play;
+  HTMLAudioElement.prototype.play = function(){ if (!isMusic(this)) return origPlay.apply(this, arguments); media.add(this); if (window.__clayAuxOn) return Promise.resolve(); return origPlay.apply(this, arguments); };
   function duck(on){
     window.__clayAuxOn = on;
-    if (on) media.forEach(m => { try { m.pause(); } catch (_) {} });
+    if (on) media.forEach(m => { try { if (isMusic(m)) m.pause(); } catch (_) {} });
     window.dispatchEvent(new CustomEvent('clayaux', { detail: { on } }));
     document.querySelectorAll('iframe').forEach(f => { try { f.contentWindow.postMessage({ clayaux: on }, '*'); } catch (_) {} });
   }
