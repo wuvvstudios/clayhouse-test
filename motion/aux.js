@@ -31,7 +31,7 @@
   #clayAux .ax-bar{ height:6px; border-radius:4px; background:rgba(27,27,27,.15); overflow:hidden; margin-top:6px } #clayAux .ax-bar i{ display:block; height:100%; width:0; background:#D8402B }
   #clayAux .ax-tap{ pointer-events:auto; cursor:pointer; background:#D8402B; color:#F3E6C8; font-family:'Bungee',Impact,sans-serif; font-size:15px; padding:6px 10px; border:2px solid #1B1B1B; border-radius:999px; margin-top:6px; display:inline-block }
   #clayAux[data-min="1"] .ax-big{ display:none }
-  @media (max-width:900px){ #clayAux{ display:none } }`;
+  @media (max-width:600px){ #clayAux{ display:none } }`;
   function mount(){
     if (document.getElementById('clayAux')) return;
     const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
