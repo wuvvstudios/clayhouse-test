@@ -97,6 +97,8 @@
   function duck(on){
     window.__clayAuxOn = on;
     if (on) media.forEach(m => { try { if (isMusic(m)) m.pause(); } catch (_) {} });
+    // safety net: a live camera feed should never sit paused because of the aux
+    document.querySelectorAll('video').forEach(v => { try { if (v.srcObject && v.paused) v.play().catch(() => {}); } catch (_) {} });
     window.dispatchEvent(new CustomEvent('clayaux', { detail: { on } }));
     document.querySelectorAll('iframe').forEach(f => { try { f.contentWindow.postMessage({ clayaux: on }, '*'); } catch (_) {} });
   }
