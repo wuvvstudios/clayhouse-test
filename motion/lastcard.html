@@ -34,11 +34,13 @@ button:focus-visible{ outline:4px solid var(--gold); outline-offset:3px }
 .card .face{ position:absolute; inset:calc(var(--cw) * .07); border-radius:calc(var(--cw) * .08); border:2px solid var(--ink); overflow:hidden;
   background:repeating-linear-gradient(135deg,rgba(255,255,255,.10) 0 6px,rgba(255,255,255,0) 6px 14px),var(--cc) }
 .card .face::before{ content:""; position:absolute; left:50%; top:50%; width:72%; aspect-ratio:1; transform:translate(-50%,-50%); border-radius:50%; background:rgba(255,255,255,.18); border:2px solid rgba(27,27,27,.35) }
-.card .mk{ position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); text-align:center; font-family:var(--disp); font-size:calc(var(--cw) * .5); line-height:1; color:var(--cream2);
+.card .mk{ position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); text-align:center; font-family:var(--disp); font-size:calc(var(--cw) * .74); line-height:1; color:var(--cream2);
   -webkit-text-stroke:calc(var(--cw) * .018) var(--ink); text-shadow:calc(var(--cw) * .03) calc(var(--cw) * .03) 0 var(--ink); z-index:1 }
-.card .mk.sm{ font-size:calc(var(--cw) * .36) }
-.card .cn{ position:absolute; font-family:var(--disp); font-size:calc(var(--cw) * .17); line-height:1; color:var(--cream2); -webkit-text-stroke:1px var(--ink); z-index:1 }
-.card .cn.a{ left:calc(var(--cw) * .1); top:calc(var(--cw) * .09) } .card .cn.b{ right:calc(var(--cw) * .1); bottom:calc(var(--cw) * .09); transform:rotate(180deg) }
+.card .ic{ width:.82em; height:.82em; display:inline-block; vertical-align:middle }
+.card .cn .ic{ width:1em; height:1em }
+.card .mk.sm{ font-size:calc(var(--cw) * .52) }
+.card .cn{ position:absolute; font-family:var(--disp); font-size:calc(var(--cw) * .26); line-height:1; color:var(--cream2); -webkit-text-stroke:1.5px var(--ink); text-shadow:1px 1px 0 var(--ink); z-index:1 }
+.card .cn.a{ left:calc(var(--cw) * .11); top:calc(var(--cw) * .1) } .card .cn.b{ right:calc(var(--cw) * .11); bottom:calc(var(--cw) * .1); transform:rotate(180deg) }
 .card.wild .face{ background:conic-gradient(from 45deg,var(--cR) 0 25%,var(--cY) 0 50%,var(--cT) 0 75%,var(--cP) 0); }
 .card.wild .face::before{ background:var(--ink); border-color:var(--cream2); width:62% }
 .card.back .face{ background:repeating-linear-gradient(45deg,#1d3a63 0 10px,#23426E 10px 20px) }
@@ -132,7 +134,7 @@ input#phCode{ letter-spacing:.3em; text-transform:uppercase; font-size:34px }
 #phTop .what span{ font-size:15px; opacity:.8 }
 #phTop.mine{ box-shadow:0 0 0 5px var(--gold),5px 5px 0 var(--ink) }
 #phMsg{ text-align:center; font-family:var(--disp); font-size:20px; min-height:26px; color:var(--gold); -webkit-text-stroke:1px var(--ink); text-shadow:2px 2px 0 var(--ink) }
-#hand{ flex:1; min-height:0; overflow-y:auto; display:flex; flex-wrap:wrap; align-content:flex-start; justify-content:center; gap:10px 8px; padding:16px 4px 8px; --cw:min(21vw,92px) }
+#hand{ flex:1; min-height:0; overflow-y:auto; display:flex; flex-wrap:wrap; align-content:flex-start; justify-content:center; gap:12px 8px; padding:16px 4px 8px; --cw:min(22.5vw,100px) }
 #hand .card{ transition:transform .15s, opacity .15s }
 #hand .card.ok{ transform:translateY(-10px); box-shadow:0 0 0 4px var(--gold),3px 4px 0 var(--ink) }
 #hand .card.no{ opacity:.45 }
@@ -141,6 +143,10 @@ input#phCode{ letter-spacing:.3em; text-transform:uppercase; font-size:34px }
 #lastBtn{ font-size:22px; padding:16px; background:var(--gold); animation:pulseB .7s ease-in-out infinite alternate }
 #catchBtn{ font-size:20px; padding:16px; background:var(--red); color:var(--cream) }
 @keyframes pulseB{ to{ transform:scale(1.04) } }
+#yourTurn{ position:fixed; inset:0; z-index:7; display:flex; align-items:center; justify-content:center; pointer-events:none; background:radial-gradient(circle,rgba(246,195,67,.55),rgba(246,195,67,0) 70%); animation:yt 1.4s ease both }
+#yourTurn .h{ font-size:17vw; -webkit-text-stroke:2.5px var(--ink); text-align:center; line-height:1 }
+@keyframes yt{ 0%{ opacity:0 } 12%{ opacity:1 } 70%{ opacity:1 } 100%{ opacity:0 } }
+#hap{ position:fixed; left:-200px; top:0; opacity:0 }
 #pick{ position:fixed; inset:0; background:rgba(20,40,74,.8); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; z-index:6; padding:20px }
 #pick h2{ font-family:var(--disp); font-weight:400; margin:0; font-size:28px; color:var(--cream); text-shadow:2px 2px 0 var(--ink) }
 #pick .g{ display:grid; grid-template-columns:1fr 1fr; gap:14px; width:100%; max-width:340px }
@@ -201,6 +207,8 @@ input#phCode{ letter-spacing:.3em; text-transform:uppercase; font-size:34px }
     <button id="catchBtn" hidden>Catch!</button>
     <div id="phBtns"><button id="drawBtn">Draw</button><button id="keepBtn" hidden>Keep it, pass</button></div>
   </section>
+  <div id="yourTurn" hidden><div class="h">Your<br>turn</div></div>
+  <label id="hapL" aria-hidden="true"><input type="checkbox" switch id="hap" tabindex="-1"></label>
   <div id="pick" hidden><h2>Pick a color</h2><div class="g">
     <button data-c="r" style="background:var(--cR)">Red</button><button data-c="y" style="background:var(--cY)">Gold</button>
     <button data-c="t" style="background:var(--cT)">Teal</button><button data-c="p" style="background:var(--cP)">Purple</button></div>
@@ -231,9 +239,12 @@ function cardHTML(c, extra){
   if (!c) return '';
   if (c === 'back') return `<div class="card back ${extra || ''}"><div class="face"></div><div class="mk">LAST<br>CARD</div></div>`;
   const v = val(c), wild = isWild(c);
-  const mark = wild ? (v === 'f' ? '+4' : '★') : v === 's' ? '⊘' : v === 'v' ? '⇄' : v === 'd' ? '+2' : v;
-  const corner = wild ? (v === 'f' ? '+4' : 'W') : v === 's' ? '⊘' : v === 'v' ? '⇄' : v === 'd' ? '+2' : v;
-  const sm = mark.length > 1 ? ' sm' : '';
+  // skip and reverse are drawn, so they look the same on every phone
+  const SKIP = '<svg class="ic" viewBox="0 0 24 24"><g fill="none" stroke-linecap="round"><g stroke="#1B1B1B" stroke-width="7"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5L17.5 6.5"/></g><g stroke="#FFF4DA" stroke-width="3.6"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5L17.5 6.5"/></g></g></svg>';
+  const REV = '<svg class="ic" viewBox="0 0 24 24"><g fill="none" stroke-linecap="round" stroke-linejoin="round"><g stroke="#1B1B1B" stroke-width="7"><path d="M4 9h14M14 5l4 4-4 4M20 15H6M10 11l-4 4 4 4"/></g><g stroke="#FFF4DA" stroke-width="3.4"><path d="M4 9h14M14 5l4 4-4 4M20 15H6M10 11l-4 4 4 4"/></g></g></svg>';
+  const mark = wild ? (v === 'f' ? '+4' : '★') : v === 's' ? SKIP : v === 'v' ? REV : v === 'd' ? '+2' : v;
+  const corner = wild ? (v === 'f' ? '+4' : 'W') : v === 's' ? SKIP : v === 'v' ? REV : v === 'd' ? '+2' : v;
+  const sm = (v === 'd' || v === 'f') ? ' sm' : '';
   return `<div class="card${wild ? ' wild' : ''} ${extra || ''}" data-c="${c}" style="--cc:${COL[c[0]] || '#1B1B1B'}"><div class="face"></div>`
     + `<span class="cn a">${corner}</span><div class="mk${sm}">${mark}</div><span class="cn b">${corner}</span></div>`;
 }
@@ -462,7 +473,26 @@ function phone(){
   try { actId = +(sessionStorage.getItem('lcAct') || 0); } catch (_) {}
   const send = o => link && link.send(Object.assign({ p: pid }, o));
   const show = id => ['phJoin', 'phWait', 'phPlay'].forEach(s => $(s).hidden = s !== id);
-  const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (_) {} };
+  // Android phones vibrate on request. iPhones don't let web pages do that, so they get Safari's switch-tap haptic, a chime and a flash instead.
+  let actx = null;
+  const iosHaptic = () => { try { $('hapL').click(); } catch (_) {} };
+  const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); else iosHaptic(); } catch (_) {} };
+  addEventListener('pointerdown', () => { try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (_) {} }, { capture: true });
+  function chime(){
+    if (!actx) return;
+    const t0 = actx.currentTime;
+    [[784, 0], [1047, 0.12], [1319, 0.24]].forEach(([f, d]) => {
+      const o = actx.createOscillator(), g = actx.createGain(); o.type = 'triangle'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + d); g.gain.exponentialRampToValueAtTime(0.35, t0 + d + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.35);
+      o.connect(g).connect(actx.destination); o.start(t0 + d); o.stop(t0 + d + 0.4);
+    });
+  }
+  function yourTurn(){
+    buzz([120, 80, 120, 80, 200]);
+    if (!navigator.vibrate){ iosHaptic(); setTimeout(iosHaptic, 180); setTimeout(iosHaptic, 360); }
+    chime();
+    const y = $('yourTurn'); y.hidden = true; void y.offsetWidth; y.hidden = false; clearTimeout(yourTurn.t); yourTurn.t = setTimeout(() => { y.hidden = true; }, 1450);
+  }
   $('phName').value = name;
   try { const h = ClayLink.cleanCode(location.hash.slice(1)); if (h) $('phCode').value = h; } catch (_) {}
 
@@ -522,7 +552,8 @@ function phone(){
   function render(){
     const hand = (S.hands[pid] || []).slice().sort((a, b) => ORDER.indexOf(a[0]) - ORDER.indexOf(b[0]) || VORD.indexOf(a[1]) - VORD.indexOf(b[1]));
     const myTurn = S.st === 'play' && S.turn === pid;
-    if (myTurn && !wasTurn) buzz([40, 60, 40]);
+    if (myTurn && !wasTurn) yourTurn();
+    if (!myTurn) $('yourTurn').hidden = true;
     wasTurn = myTurn;
     $('phTopCard').innerHTML = cardHTML(S.top);
     const tc = $('phTopCard').firstChild; if (tc && isWild(S.top)) tc.querySelector('.face').style.boxShadow = `inset 0 0 0 6px ${COL[S.color]}`;
