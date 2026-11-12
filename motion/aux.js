@@ -16,21 +16,23 @@
 
   // ---------- the widget ----------
   const css = `
-  #clayAux{ position:fixed; left:18px; bottom:18px; z-index:2147483000; font-family:'Oswald','Arial Narrow',sans-serif; color:#1B1B1B; display:flex; align-items:flex-end; gap:12px; pointer-events:none }
+  #clayAux{ position:fixed; left:18px; bottom:18px; z-index:2147483000; transition:opacity .25s ease; font-family:'Oswald','Arial Narrow',sans-serif; color:#1B1B1B; display:flex; align-items:flex-end; gap:12px; pointer-events:none }
   #clayAux *{ box-sizing:border-box }
-  #clayAux .ax-card{ pointer-events:auto; background:#F3E6C8; border:3px solid #1B1B1B; border-radius:16px; box-shadow:5px 5px 0 #1B1B1B; padding:10px 12px; display:flex; align-items:center; gap:12px }
-  #clayAux .ax-qr{ width:84px; height:84px; background:#fff; border:2px solid #1B1B1B; border-radius:8px; padding:5px }
+  #clayAux .ax-card{ pointer-events:none; background:#F3E6C8; border:3px solid #1B1B1B; border-radius:16px; box-shadow:5px 5px 0 #1B1B1B; padding:10px 12px; display:flex; align-items:center; gap:12px }
+  #clayAux .ax-qr{ width:70px; height:70px; background:#fff; border:2px solid #1B1B1B; border-radius:8px; padding:5px }
   #clayAux .ax-qr svg{ width:100%; height:100% }
   #clayAux .ax-t{ font-family:'Bungee',Impact,sans-serif; font-size:18px; line-height:1.05 }
   #clayAux .ax-s{ font-size:14px; opacity:.8; line-height:1.25; max-width:230px }
   #clayAux .ax-code{ font-family:'Bungee',Impact,sans-serif; font-size:22px; letter-spacing:.12em }
-  #clayAux .ax-player{ pointer-events:auto; width:200px; height:200px; border:3px solid #1B1B1B; border-radius:14px; overflow:hidden; box-shadow:5px 5px 0 #1B1B1B; background:#000 }
+  #clayAux .ax-player{ pointer-events:none; width:200px; height:200px; border:3px solid #1B1B1B; border-radius:14px; overflow:hidden; box-shadow:5px 5px 0 #1B1B1B; background:#000 }
   #clayAux .ax-player iframe,#clayAux .ax-player > div{ width:100%; height:100% }
   #clayAux .ax-now{ max-width:300px }
   #clayAux .ax-now b{ display:block; font-family:'Bungee',Impact,sans-serif; font-weight:400; font-size:17px; line-height:1.1; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical }
   #clayAux .ax-bar{ height:6px; border-radius:4px; background:rgba(27,27,27,.15); overflow:hidden; margin-top:6px } #clayAux .ax-bar i{ display:block; height:100%; width:0; background:#D8402B }
   #clayAux .ax-tap{ pointer-events:auto; cursor:pointer; background:#D8402B; color:#F3E6C8; font-family:'Bungee',Impact,sans-serif; font-size:15px; padding:6px 10px; border:2px solid #1B1B1B; border-radius:999px; margin-top:6px; display:inline-block }
   #clayAux[data-min="1"] .ax-big{ display:none }
+  #clayAux iframe{ pointer-events:none }
+  #clayAux.ghost{ opacity:.12 }
   @media (max-width:600px){ #clayAux{ display:none } }`;
   function mount(){
     if (document.getElementById('clayAux')) return;
@@ -40,6 +42,17 @@
     document.body.appendChild(box);
     render();
   }
+  // the corner never blocks the game: clicks pass straight through it, and it fades out of the way whenever
+  // the mouse or the camera's hand pointer comes near it
+  let px = -1, py = -1;
+  addEventListener('pointermove', e => { px = e.clientX; py = e.clientY; }, { passive: true, capture: true });
+  setInterval(() => {
+    const box = document.getElementById('clayAux'); if (!box) return;
+    let x = px, y = py; const cur = document.getElementById('cursor');
+    if (cur && !cur.hidden && cur.offsetParent){ const c = cur.getBoundingClientRect(); x = c.left + c.width / 2; y = c.top + c.height / 2; }
+    const r = box.getBoundingClientRect(), pad = 40;
+    box.classList.toggle('ghost', !muteBlocked && x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad);
+  }, 120);
   function url(){ return (location.protocol === 'https:' ? new URL('aux.html', BASE).href : ONLINE) + '#' + S.code; }
   function render(){
     const card = document.getElementById('axCard'); if (!card) return;
