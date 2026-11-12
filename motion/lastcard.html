@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#2B5A97">
+<title>Clayhouse Last Card</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Last Card: the classic match-the-color-or-number card game. Your hand lives on your phone, the TV is the table.
+   One page, two modes: opened plainly it is the TV; opened from the QR (lastcard.html?phone#CODE) it is a phone. */
+:root{ --ink:#1B1B1B; --cream:#F3E6C8; --cream2:#FFF4DA; --gold:#F6C343; --rust:#B5541E; --red:#D8402B; --blue:#2B5A97; --navy:#23426E;
+  --cR:#D8402B; --cY:#F2B92E; --cT:#1F8C93; --cP:#7A55C8;
+  --disp:'Bungee',Impact,sans-serif; --ui:'Oswald','Arial Narrow',sans-serif }
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent }
+[hidden]{ display:none !important }
+html,body{ margin:0; height:100%; overflow:hidden; color:var(--cream); font-family:var(--ui);
+  background:radial-gradient(ellipse at 45% 40%,rgba(0,0,0,0) 55%,rgba(5,10,30,.45) 100%),
+    repeating-conic-gradient(from 0deg at 18% 78%,rgba(255,240,200,.07) 0deg 7deg,rgba(0,0,0,0) 7deg 14deg),var(--blue) }
+body{ user-select:none; -webkit-user-select:none; overscroll-behavior:none; touch-action:manipulation }
+.h{ font-family:var(--disp); font-weight:400; color:var(--gold); -webkit-text-stroke:1.5px var(--ink); text-shadow:2px 2px 0 var(--rust),4px 4px 0 var(--rust),6px 6px 0 var(--ink); margin:0; line-height:1 }
+.panel{ background:var(--cream); color:var(--ink); border:3px solid var(--ink); border-radius:20px; box-shadow:6px 6px 0 var(--ink) }
+button{ font-family:var(--disp); font-size:22px; letter-spacing:.02em; color:var(--ink); background:var(--cream); border:3px solid var(--ink); border-radius:999px;
+  box-shadow:4px 4px 0 var(--ink); padding:14px 26px; cursor:pointer; transition:transform .1s, box-shadow .1s }
+button:active{ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--ink) }
+button.red{ background:var(--red); color:var(--cream) }
+button.gold{ background:var(--gold) }
+button:disabled{ opacity:.45 }
+button:focus-visible{ outline:4px solid var(--gold); outline-offset:3px }
+
+/* the cards: cream border, colored face, a big outlined mark in the middle */
+.card{ position:relative; width:var(--cw); height:calc(var(--cw) * 1.45); border-radius:calc(var(--cw) * .12); border:3px solid var(--ink); background:var(--cream2);
+  padding:calc(var(--cw) * .07); box-shadow:3px 4px 0 var(--ink); flex-shrink:0 }
+.card .face{ position:absolute; inset:calc(var(--cw) * .07); border-radius:calc(var(--cw) * .08); border:2px solid var(--ink); overflow:hidden;
+  background:repeating-linear-gradient(135deg,rgba(255,255,255,.10) 0 6px,rgba(255,255,255,0) 6px 14px),var(--cc) }
+.card .face::before{ content:""; position:absolute; left:50%; top:50%; width:72%; aspect-ratio:1; transform:translate(-50%,-50%); border-radius:50%; background:rgba(255,255,255,.18); border:2px solid rgba(27,27,27,.35) }
+.card .mk{ position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); text-align:center; font-family:var(--disp); font-size:calc(var(--cw) * .5); line-height:1; color:var(--cream2);
+  -webkit-text-stroke:calc(var(--cw) * .018) var(--ink); text-shadow:calc(var(--cw) * .03) calc(var(--cw) * .03) 0 var(--ink); z-index:1 }
+.card .mk.sm{ font-size:calc(var(--cw) * .36) }
+.card .cn{ position:absolute; font-family:var(--disp); font-size:calc(var(--cw) * .17); line-height:1; color:var(--cream2); -webkit-text-stroke:1px var(--ink); z-index:1 }
+.card .cn.a{ left:calc(var(--cw) * .1); top:calc(var(--cw) * .09) } .card .cn.b{ right:calc(var(--cw) * .1); bottom:calc(var(--cw) * .09); transform:rotate(180deg) }
+.card.wild .face{ background:conic-gradient(from 45deg,var(--cR) 0 25%,var(--cY) 0 50%,var(--cT) 0 75%,var(--cP) 0); }
+.card.wild .face::before{ background:var(--ink); border-color:var(--cream2); width:62% }
+.card.back .face{ background:repeating-linear-gradient(45deg,#1d3a63 0 10px,#23426E 10px 20px) }
+.card.back .face::before{ display:none }
+.card.back .mk{ font-size:calc(var(--cw) * .2); color:var(--gold); transform:translateY(-50%) rotate(-28deg); line-height:1.05 }
+
+/* TV */
+#tv{ position:fixed; inset:0; display:flex; flex-direction:column; padding:26px 40px 24px; gap:16px }
+#tv header{ display:flex; align-items:center; justify-content:space-between; gap:20px }
+#tv header .h{ font-size:clamp(34px,4.2vw,64px) }
+#tv .meta{ display:flex; gap:12px; align-items:center }
+.chip{ font-family:var(--disp); font-size:18px; padding:8px 16px; border-radius:999px; border:3px solid var(--ink); background:var(--cream); color:var(--ink); box-shadow:3px 3px 0 var(--ink); white-space:nowrap }
+#lobby{ flex:1; display:grid; grid-template-columns:minmax(300px,400px) 1fr; gap:36px; align-items:center }
+#pair{ padding:24px; display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center }
+#qr{ width:100%; max-width:280px; aspect-ratio:1; background:#fff; border:3px solid var(--ink); border-radius:14px; padding:14px }
+#qr svg{ width:100%; height:100% }
+#pair .code{ font-family:var(--disp); font-size:52px; letter-spacing:.12em; line-height:1 }
+#pair p{ margin:0; font-size:19px; line-height:1.3 }
+#lobbyR{ display:flex; flex-direction:column; gap:20px }
+#seats{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px }
+.seat{ padding:14px 16px; display:flex; align-items:center; gap:12px; min-height:84px }
+.seat .dot{ width:36px; height:36px; border-radius:50%; border:3px solid var(--ink); flex-shrink:0 }
+.seat b{ font-family:var(--disp); font-size:22px; font-weight:400; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.seat span{ font-size:15px; opacity:.75 }
+.seat > div{ min-width:0 }
+.seat.empty{ opacity:.5; background:transparent; color:var(--cream); border-style:dashed; box-shadow:none; border-color:var(--cream) }
+.seat.empty .dot{ border-color:var(--cream); background:transparent !important }
+#lobbyTip{ font-size:21px; margin:0; color:var(--cream); text-shadow:1px 1px 0 rgba(0,0,0,.35); line-height:1.35 }
+.rules{ display:flex; gap:14px; align-items:center; flex-wrap:wrap }
+.rules button{ font-size:17px; padding:10px 18px }
+.rules button[aria-pressed="true"]{ background:var(--gold) }
+#lobbyGo{ align-self:flex-start; font-size:30px; padding:18px 40px }
+#table{ flex:1; display:flex; flex-direction:column; gap:18px; min-height:0 }
+#felt{ flex:1; position:relative; display:flex; align-items:center; justify-content:center; gap:70px; min-height:0 }
+#felt .ring{ position:absolute; width:min(52vh,560px); aspect-ratio:1; border-radius:50%; border:10px solid var(--glow,#fff); opacity:.5; filter:blur(1px); transition:border-color .4s }
+#dir{ position:absolute; width:min(62vh,660px); aspect-ratio:1; border-radius:50%; border:4px dashed rgba(243,230,200,.35); animation:spin 14s linear infinite }
+#dir::after{ content:"\25B6"; position:absolute; left:50%; top:-22px; transform:translateX(-50%); font-size:30px; color:var(--cream); text-shadow:2px 2px 0 var(--ink) }
+#dir.ccw{ animation-direction:reverse } #dir.ccw::after{ content:"\25C0" }
+@keyframes spin{ to{ transform:rotate(360deg) } }
+#drawPile,#pile{ position:relative; --cw:min(15vh,170px); z-index:1 }
+#drawPile{ width:var(--cw); height:calc(var(--cw) * 1.45) }
+#drawPile .card{ position:absolute; left:0; top:0 }
+#drawPile small{ position:absolute; left:0; right:0; bottom:-34px; text-align:center; font-family:var(--disp); font-size:18px; color:var(--cream); text-shadow:2px 2px 0 var(--ink) }
+#pile{ width:calc(var(--cw) * 1.4); height:calc(var(--cw) * 1.6) }
+#pile .card{ position:absolute; left:50%; top:50%; margin-left:calc(var(--cw) * -.5); margin-top:calc(var(--cw) * -.725) }
+#pile .card.in{ animation:slap .35s cubic-bezier(.2,.8,.2,1.2) both }
+@keyframes slap{ from{ transform:translate(-120px,240px) rotate(-30deg) scale(1.3); opacity:.3 } }
+#toast{ position:absolute; left:50%; bottom:-6px; transform:translateX(-50%); font-family:var(--disp); font-size:40px; color:var(--gold); -webkit-text-stroke:1.5px var(--ink); text-shadow:3px 3px 0 var(--ink); white-space:nowrap; z-index:2 }
+#toast.pop{ animation:pop .4s cubic-bezier(.2,.8,.2,1.3) both }
+@keyframes pop{ from{ transform:translateX(-50%) scale(1.6); opacity:0 } }
+#plates{ display:flex; gap:14px; justify-content:center; flex-wrap:wrap }
+.plate{ position:relative; padding:16px 22px 16px 18px; display:flex; align-items:center; gap:14px; min-width:230px; transition:transform .25s, box-shadow .25s }
+.plate .dot{ width:40px; height:40px; border-radius:50%; border:3px solid var(--ink); flex-shrink:0 }
+.plate b{ font-family:var(--disp); font-weight:400; font-size:30px; display:block; max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.plate .fan{ display:flex; height:44px; align-items:center; --cw:28px }
+.plate .fan .card{ margin-right:-18px; box-shadow:1px 2px 0 var(--ink); border-width:2px }
+.plate .fan .card .face{ border-width:1px }
+.plate .n{ font-family:var(--disp); font-size:36px; margin-left:24px }
+.plate.turn{ transform:translateY(-10px); box-shadow:0 0 0 6px var(--gold),6px 6px 0 var(--ink) }
+.plate.turn::before{ content:"\25BC"; position:absolute; left:50%; top:-36px; transform:translateX(-50%); font-size:26px; color:var(--gold); -webkit-text-stroke:1.5px var(--ink); animation:bob .8s ease-in-out infinite }
+@keyframes bob{ 50%{ transform:translate(-50%,-6px) } }
+.plate .tag{ position:absolute; right:-12px; top:-16px; font-family:var(--disp); font-size:14px; padding:4px 10px; border:2px solid var(--ink); border-radius:999px; background:var(--gold); color:var(--ink); transform:rotate(6deg); box-shadow:2px 2px 0 var(--ink) }
+.plate .tag.warn{ background:var(--red); color:var(--cream); animation:pulse .6s ease-in-out infinite alternate }
+@keyframes pulse{ to{ transform:rotate(6deg) scale(1.12) } }
+.plate .wins{ font-family:var(--disp); font-size:14px; color:var(--rust); letter-spacing:.1em }
+#win{ position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px; background:rgba(20,40,74,.78); z-index:6 }
+#win .h{ font-size:clamp(60px,9vw,150px); -webkit-text-stroke:3px var(--ink); text-shadow:6px 6px 0 var(--rust),12px 12px 0 var(--ink); animation:pop2 .5s cubic-bezier(.2,.8,.2,1.3) both; text-align:center }
+@keyframes pop2{ from{ transform:scale(2); opacity:0 } }
+#win p{ margin:0; font-size:26px }
+#win .row{ display:flex; gap:16px }
+
+/* phone */
+#ph{ position:fixed; inset:0; display:flex; flex-direction:column; gap:10px; padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)) }
+#ph header{ display:flex; align-items:center; gap:10px }
+#ph header .h{ font-size:24px; flex:1; text-shadow:1px 1px 0 var(--rust),2px 2px 0 var(--rust),3px 3px 0 var(--ink) }
+#ph .chip{ font-size:13px; padding:6px 10px }
+.ph-sec{ flex:1; display:flex; flex-direction:column; gap:12px; min-height:0 }
+#phJoin,#phWait{ justify-content:center }
+#phJoin .panel,#phWait .panel{ padding:20px; display:flex; flex-direction:column; gap:14px }
+#phJoin h2,#phWait h2{ font-family:var(--disp); font-weight:400; font-size:26px; margin:0; line-height:1.1 }
+#phJoin p,#phWait p{ margin:0; font-size:17px; line-height:1.35 }
+input{ font-family:var(--disp); font-size:26px; text-align:center; padding:12px; border:3px solid var(--ink); border-radius:14px; background:#fff; color:var(--ink); width:100%; min-width:0 }
+input#phCode{ letter-spacing:.3em; text-transform:uppercase; font-size:34px }
+#phWait .me{ display:flex; align-items:center; gap:12px }
+#phWait .me .dot{ width:40px; height:40px; border-radius:50%; border:3px solid var(--ink) }
+#phWait .me b{ font-family:var(--disp); font-weight:400; font-size:26px }
+#phTop{ display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:16px }
+#phTop .mini{ --cw:56px }
+#phTop .what{ flex:1; min-width:0 }
+#phTop .what b{ display:block; font-family:var(--disp); font-weight:400; font-size:22px; line-height:1.1 }
+#phTop .what span{ font-size:15px; opacity:.8 }
+#phTop.mine{ box-shadow:0 0 0 5px var(--gold),5px 5px 0 var(--ink) }
+#phMsg{ text-align:center; font-family:var(--disp); font-size:20px; min-height:26px; color:var(--gold); -webkit-text-stroke:1px var(--ink); text-shadow:2px 2px 0 var(--ink) }
+#hand{ flex:1; min-height:0; overflow-y:auto; display:flex; flex-wrap:wrap; align-content:flex-start; justify-content:center; gap:10px 8px; padding:16px 4px 8px; --cw:min(21vw,92px) }
+#hand .card{ transition:transform .15s, opacity .15s }
+#hand .card.ok{ transform:translateY(-10px); box-shadow:0 0 0 4px var(--gold),3px 4px 0 var(--ink) }
+#hand .card.no{ opacity:.45 }
+#hand .card.drawn{ transform:translateY(-14px) scale(1.05); box-shadow:0 0 0 5px #fff,3px 4px 0 var(--ink) }
+#phBtns{ display:flex; gap:10px } #phBtns button{ flex:1; font-size:18px; padding:15px 8px }
+#lastBtn{ font-size:22px; padding:16px; background:var(--gold); animation:pulseB .7s ease-in-out infinite alternate }
+#catchBtn{ font-size:20px; padding:16px; background:var(--red); color:var(--cream) }
+@keyframes pulseB{ to{ transform:scale(1.04) } }
+#pick{ position:fixed; inset:0; background:rgba(20,40,74,.8); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; z-index:6; padding:20px }
+#pick h2{ font-family:var(--disp); font-weight:400; margin:0; font-size:28px; color:var(--cream); text-shadow:2px 2px 0 var(--ink) }
+#pick .g{ display:grid; grid-template-columns:1fr 1fr; gap:14px; width:100%; max-width:340px }
+#pick .g button{ height:110px; border-radius:22px; font-size:20px; color:var(--cream2); -webkit-text-stroke:1px var(--ink); text-shadow:2px 2px 0 var(--ink) }
+</style>
+</head><body>
+
+<!-- the TV -->
+<main id="tv" hidden>
+  <header><h1 class="h">Last Card</h1><div class="meta"><span class="chip" id="tvRound">Lobby</span><span class="chip" id="tvLink">Connecting</span></div></header>
+  <section id="lobby">
+    <div id="pair" class="panel">
+      <div id="qr" aria-label="QR code to join"></div>
+      <div class="code" id="tvCode">----</div>
+      <p>Scan with your phone camera, or open <b id="tvUrl">the Clayhouse controller</b> and type the code.</p>
+    </div>
+    <div id="lobbyR">
+      <div id="seats"></div>
+      <p id="lobbyTip">Match the top card by color or by number. Skip, Reverse, +2, Wild and Wild +4 do what they say. Down to one card? Tap Last Card on your phone before someone catches you.</p>
+      <div class="rules"><span style="font-size:20px">House rules:</span><button id="ruleStack" aria-pressed="true">Stack +2 and +4</button><button id="ruleDraw" aria-pressed="false">Draw until you can play</button></div>
+      <button id="lobbyGo" class="red" disabled>Deal</button>
+    </div>
+  </section>
+  <section id="table" hidden>
+    <div id="felt"><div class="ring" id="ring"></div><div id="dir"></div>
+      <div id="drawPile"></div><div id="pile"></div><div id="toast"></div></div>
+    <div id="plates"></div>
+  </section>
+  <div id="win" hidden><div class="h" id="winH">Winner</div><p id="winP"></p><div class="row"><button id="againBtn" class="red">Deal again</button><button id="lobbyBtn">Players</button></div></div>
+</main>
+
+<!-- the phone -->
+<main id="ph" hidden>
+  <header><h1 class="h">Last Card</h1><span class="chip" id="phLink">Not connected</span></header>
+  <section id="phJoin" class="ph-sec">
+    <div class="panel">
+      <h2>Join the table</h2>
+      <p>Type the four letters on the TV.</p>
+      <input id="phCode" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Room code">
+      <input id="phName" maxlength="10" placeholder="Your name" autocomplete="off" aria-label="Your name" style="font-size:22px;letter-spacing:0">
+      <button id="phGo" class="red">Join</button>
+    </div>
+  </section>
+  <section id="phWait" class="ph-sec" hidden>
+    <div class="panel">
+      <div class="me"><span class="dot" id="phDot"></span><b id="phMe">Player</b></div>
+      <h2 id="phWaitH">You're in</h2>
+      <p id="phWaitP">Waiting for everyone. Anyone can deal.</p>
+      <input id="phName2" maxlength="10" placeholder="Change name" autocomplete="off" aria-label="Your name" style="font-size:20px;letter-spacing:0">
+      <button id="phStart" class="red">Deal</button>
+    </div>
+  </section>
+  <section id="phPlay" class="ph-sec" hidden>
+    <div id="phTop" class="panel"><div class="mini" id="phTopCard"></div><div class="what"><b id="phTurn">Waiting</b><span id="phSub"></span></div></div>
+    <div id="phMsg"></div>
+    <div id="hand"></div>
+    <button id="lastBtn" hidden>Last Card!</button>
+    <button id="catchBtn" hidden>Catch!</button>
+    <div id="phBtns"><button id="drawBtn">Draw</button><button id="keepBtn" hidden>Keep it, pass</button></div>
+  </section>
+  <div id="pick" hidden><h2>Pick a color</h2><div class="g">
+    <button data-c="r" style="background:var(--cR)">Red</button><button data-c="y" style="background:var(--cY)">Gold</button>
+    <button data-c="t" style="background:var(--cT)">Teal</button><button data-c="p" style="background:var(--cP)">Purple</button></div>
+    <button id="pickX">Cancel</button></div>
+</main>
+
+<script src="lib/peerjs.min.js"></script>
+<script src="lib/mqtt.min.js?v=5"></script>
+<script src="link.js?v=5"></script>
+<script src="lib/qrcode.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const MAXP = 8;
+const SEAT = ['#F6C343', '#7A55C8', '#25919B', '#E86FA0', '#D8402B', '#3A9160', '#E57A33', '#6FB7F0'];
+const SEATNAME = ['Gold', 'Purple', 'Teal', 'Pink', 'Red', 'Green', 'Orange', 'Sky'];
+const COL = { r: '#D8402B', y: '#F2B92E', t: '#1F8C93', p: '#7A55C8' };
+const COLNAME = { r: 'Red', y: 'Gold', t: 'Teal', p: 'Purple' };
+const ONLINE = 'https://wuvvstudios.github.io/clayhouse-test/motion/lastcard.html';
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+// a card is two letters: color (r y t p, or w for wild) and value (0-9, s skip, v reverse, d +2; wilds: w plain, f +4)
+const isWild = c => c[0] === 'w';
+const val = c => c[1];
+function cardHTML(c, extra){
+  if (!c) return '';
+  if (c === 'back') return `<div class="card back ${extra || ''}"><div class="face"></div><div class="mk">LAST<br>CARD</div></div>`;
+  const v = val(c), wild = isWild(c);
+  const mark = wild ? (v === 'f' ? '+4' : '★') : v === 's' ? '⊘' : v === 'v' ? '⇄' : v === 'd' ? '+2' : v;
+  const corner = wild ? (v === 'f' ? '+4' : 'W') : v === 's' ? '⊘' : v === 'v' ? '⇄' : v === 'd' ? '+2' : v;
+  const sm = mark.length > 1 ? ' sm' : '';
+  return `<div class="card${wild ? ' wild' : ''} ${extra || ''}" data-c="${c}" style="--cc:${COL[c[0]] || '#1B1B1B'}"><div class="face"></div>`
+    + `<span class="cn a">${corner}</span><div class="mk${sm}">${mark}</div><span class="cn b">${corner}</span></div>`;
+}
+function newDeck(){
+  const d = [];
+  for (const c of 'rytp'){
+    d.push(c + '0');
+    for (let n = 1; n <= 9; n++) d.push(c + n, c + n);
+    for (const v of 'svd') d.push(c + v, c + v);
+  }
+  for (let i = 0; i < 4; i++) d.push('ww', 'wf');
+  return shuffle(d);
+}
+
+// =====================================================================================
+// TV: holds the deck and every hand, and is the only one who decides what is legal
+// =====================================================================================
+function tv(){
+  $('tv').hidden = false;
+  let code = ClayLink.newCode(), link = null;
+  const players = [];                 // {p, name, seat, seen, wins}
+  const rules = { stack: true, drawTill: false };
+  let st = 'lobby', round = 0;
+  // game state
+  let deck = [], pile = [], hands = {}, order = [], turn = 0, dir = 1, color = 'r', pending = 0, drawn = null, called = {}, exposed = null, winner = null, ack = {}, seq = 0, lastEvent = '';
+
+  function url(){ return (location.protocol === 'https:' ? location.href.split('#')[0].split('?')[0] : ONLINE) + '?phone#' + code; }
+  function showPair(){
+    $('tvCode').textContent = code;
+    $('tvUrl').textContent = url().replace(/^https:\/\//, '').replace(/\?phone#.*/, '');
+    try { const qr = qrcode(0, 'M'); qr.addData(url()); qr.make(); $('qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch (_) { $('qr').textContent = code; }
+  }
+  function startLink(){
+    if (link) link.close();
+    link = ClayLink.host(code, onMsg, s => {
+      if (s === 'taken'){ code = ClayLink.newCode(); showPair(); startLink(); }
+      else if (s === 'ready' || s === 'relay') $('tvLink').textContent = 'Ready';
+    });
+  }
+  const send = o => link && link.send(o);
+  const byP = p => players.find(x => x.p === p);
+  const nameOf = p => (byP(p) || {}).name || 'Someone';
+  function seatFree(){ for (let s = 0; s < MAXP; s++) if (!players.some(p => p.seat === s)) return s; return -1; }
+
+  function onMsg(m){
+    if (!m || typeof m.t !== 'string' || !m.p) return;
+    let pl = byP(m.p);
+    if (m.t === 'lc-hi'){
+      const name = String(m.name || '').slice(0, 10).trim();
+      if (!pl){
+        const s = seatFree(); if (s < 0) return;
+        pl = { p: m.p, name: name || SEATNAME[s], seat: s, wins: 0, seen: 0 };
+        players.push(pl); players.sort((a, b) => a.seat - b.seat); renderSeats();
+      } else if (name && name !== pl.name){ pl.name = name; renderSeats(); }
+      pl.seen = performance.now(); broadcast(); return;
+    }
+    if (!pl) return;
+    pl.seen = performance.now();
+    if (m.t !== 'lc-act') return;
+    const id = +m.id || 0;
+    if (id <= (ack[m.p] || 0)) { broadcast(); return; }   // already handled; the phone just didn't hear back
+    ack[m.p] = id;
+    act(m.p, m);
+    broadcast();
+  }
+
+  // ---------- rules ----------
+  function deal1(){
+    if (!deck.length){ const top = pile.pop(); deck = shuffle(pile.map(c => c)); pile = [top]; event('Reshuffled the pile'); }
+    return deck.pop();
+  }
+  const cur = () => order[turn];
+  const step = (k) => { turn = ((turn + dir * (k || 1)) % order.length + order.length) % order.length; };
+  function playable(c, p){
+    const top = pile[pile.length - 1];
+    if (drawn && drawn.p === p && drawn.c !== c) return false;       // after drawing, only the drawn card may be played
+    if (pending){ if (!rules.stack) return false; return val(c) === 'f' || (val(top) === 'd' && val(c) === 'd'); }
+    if (isWild(c)) return true;
+    return c[0] === color || (!isWild(top) && val(c) === val(top));
+  }
+  function give(p, n){ const h = hands[p]; for (let i = 0; i < n; i++) h.push(deal1()); called[p] = false; if (exposed === p) exposed = null; }
+  function event(t){ lastEvent = t; seq++; showToast(t); }
+
+  function act(p, m){
+    if (st !== 'play') return;
+    if (m.a === 'last'){
+      if (hands[p] && hands[p].length <= 2){ called[p] = true; if (exposed === p){ exposed = null; } event(nameOf(p) + ': Last card!'); }
+      return;
+    }
+    if (m.a === 'catch'){
+      if (exposed && exposed !== p){ const v = exposed; give(v, 2); event(nameOf(p) + ' caught ' + nameOf(v) + '! +2'); }
+      return;
+    }
+    if (p !== cur()) return;
+    const h = hands[p];
+    if (m.a === 'play'){
+      const c = String(m.c || ''), i = h.indexOf(c);
+      if (i < 0 || !playable(c, p)) return;
+      h.splice(i, 1); pile.push(c); drawn = null;
+      if (exposed && exposed !== p) exposed = null;                   // the window to catch someone closes once the next card is played
+      color = isWild(c) ? (COL[m.col] ? m.col : 'r') : c[0];
+      if (h.length === 1 && !called[p]) exposed = p;
+      if (h.length !== 1) called[p] = false;
+      if (!h.length){ endRound(p); return; }
+      const n = order.length, v = val(c);
+      const who = nameOf(p);
+      if (v === 's'){ step(1); event(nameOf(cur()) + ' is skipped'); step(1); }
+      else if (v === 'v'){ if (n === 2){ step(2); event('Reverse! ' + who + ' goes again'); } else { dir = -dir; step(1); event('Reverse!'); } }
+      else if (v === 'd' || v === 'f'){
+        const add = v === 'd' ? 2 : 4;
+        if (rules.stack){ pending += add; step(1); event((isWild(c) ? COLNAME[color] + '! ' : '') + nameOf(cur()) + ' takes +' + pending + ' or stacks'); }
+        else { step(1); const t = cur(); give(t, add); event(nameOf(t) + ' draws ' + add + ' and is skipped'); step(1); }
+      }
+      else { if (isWild(c)) event(who + ' picks ' + COLNAME[color]); else seq++; step(1); }
+      return;
+    }
+    if (m.a === 'draw'){
+      if (drawn) return;
+      if (pending){ const n = pending; pending = 0; give(p, n); event(nameOf(p) + ' takes +' + n); step(1); return; }
+      let c = deal1(); h.push(c); called[p] = false; if (exposed === p) exposed = null;
+      if (rules.drawTill){ let k = 1; while (!playable(c, p) && k < 30){ c = deal1(); h.push(c); k++; } drawn = { p, c }; event(nameOf(p) + ' drew ' + k); return; }
+      if (playable(c, p)){ drawn = { p, c }; seq++; }
+      else { event(nameOf(p) + ' drew and passed'); step(1); }
+      return;
+    }
+    if (m.a === 'keep'){ if (drawn && drawn.p === p){ drawn = null; event(nameOf(p) + ' kept it'); step(1); } }
+  }
+
+  function startRound(){
+    if (players.length < 2) return;
+    round++; st = 'play'; winner = null;
+    deck = newDeck(); pile = []; hands = {}; called = {}; exposed = null; pending = 0; drawn = null; dir = 1;
+    order = players.map(p => p.p);
+    order.forEach(p => { hands[p] = []; for (let i = 0; i < 7; i++) hands[p].push(deck.pop()); });
+    // start on a plain number card
+    let c = deck.pop(); while (!/[0-9]/.test(val(c)) || isWild(c)){ deck.unshift(c); c = deck.pop(); }
+    pile.push(c); color = c[0];
+    turn = (round - 1) % order.length;
+    $('tvRound').textContent = 'Round ' + round;
+    $('lobby').hidden = true; $('table').hidden = false; $('win').hidden = true;
+    event(nameOf(cur()) + ' goes first');
+    renderTable(true); broadcast();
+  }
+  function endRound(p){
+    winner = p; st = 'over'; const w = byP(p); if (w) w.wins++;
+    seq++; renderTable(); broadcast();
+    $('winH').textContent = nameOf(p) + ' wins!';
+    $('winP').textContent = order.filter(x => x !== p).map(x => nameOf(x) + ' had ' + hands[x].length).join(' · ');
+    setTimeout(() => { $('win').hidden = false; }, 700);
+  }
+
+  // ---------- what phones hear (every change, and once a second) ----------
+  function broadcast(){
+    const base = { t: 'lc-st', st, seq, round, roster: players.map(p => ({ p: p.p, name: p.name, seat: p.seat, wins: p.wins })), ack, rules };
+    if (st === 'play' || st === 'over'){
+      Object.assign(base, { order, turn: cur(), dir, top: pile[pile.length - 1], color, pending, drawn: drawn && drawn.p === cur() ? drawn : null, called, exposed, winner,
+        counts: Object.fromEntries(order.map(p => [p, hands[p].length])), hands, ev: lastEvent });
+    }
+    send(base);
+    if (st === 'play') renderTable();
+  }
+  setInterval(() => {
+    if (st === 'lobby'){ const now = performance.now(); for (let i = players.length - 1; i >= 0; i--) if (now - players[i].seen > 20000){ players.splice(i, 1); renderSeats(); } }
+    broadcast();
+  }, 1000);
+
+  // ---------- drawing the TV ----------
+  function renderSeats(){
+    const n = Math.min(MAXP, Math.max(4, players.length + 1));
+    let h = '';
+    for (let s = 0; s < n; s++){
+      const p = players[s];
+      h += p ? `<div class="seat panel"><span class="dot" style="background:${SEAT[p.seat]}"></span><div><b>${esc(p.name)}</b><span>${p.wins ? p.wins + (p.wins > 1 ? ' wins' : ' win') : 'Ready'}</span></div></div>`
+             : `<div class="seat panel empty"><span class="dot"></span><div><b>Open</b><span>Scan to join</span></div></div>`;
+    }
+    $('seats').innerHTML = h;
+    $('lobbyGo').disabled = players.length < 2;
+    $('lobbyGo').textContent = players.length < 2 ? 'Need 2 players' : 'Deal';
+  }
+  let shownTop = '', shownLen = 0;
+  function renderTable(fresh){
+    // the discard pile: the top few cards, each tilted a little
+    if (fresh){ shownTop = ''; shownLen = 0; }
+    if (pile.length !== shownLen){
+      const last = pile.slice(-4);
+      $('pile').innerHTML = last.map((c, i) => { const r = ((pile.length - last.length + i) * 47 % 30) - 15; return cardHTML(c, i === last.length - 1 && pile.length > shownLen && !fresh ? 'in' : '').replace('class="card', `style="transform:rotate(${r}deg)" class="card`); }).join('');
+      // keep each card's own color variable while adding the tilt
+      [...$('pile').children].forEach((el, i) => { const c = last[i]; el.style.setProperty('--cc', COL[c[0]] || '#1B1B1B'); });
+      shownLen = pile.length;
+    }
+    $('drawPile').innerHTML = cardHTML('back') + `<small>${deck.length} left</small>`;
+    $('ring').style.setProperty('--glow', COL[color]);
+    $('dir').classList.toggle('ccw', dir < 0);
+    $('plates').innerHTML = order.map(p => {
+      const pl = byP(p) || { name: '?', seat: 0, wins: 0 }, n = hands[p].length;
+      const fan = Array.from({ length: Math.min(n, 9) }, () => cardHTML('back')).join('');
+      const tag = exposed === p ? '<span class="tag warn">Catch them!</span>' : n === 1 && called[p] ? '<span class="tag">Last card!</span>' : '';
+      return `<div class="plate panel${p === cur() && st === 'play' ? ' turn' : ''}"><span class="dot" style="background:${SEAT[pl.seat]}"></span><div><b>${esc(pl.name)}</b><span class="wins">${'★'.repeat(pl.wins)}</span></div><div class="fan">${fan}</div><span class="n">${n}</span>${tag}</div>`;
+    }).join('');
+  }
+  let toastT = 0;
+  function showToast(t){ const e = $('toast'); e.textContent = t; e.classList.remove('pop'); void e.offsetWidth; e.classList.add('pop'); clearTimeout(toastT); toastT = setTimeout(() => { if (e.textContent === t) e.textContent = ''; }, 3500); }
+
+  $('ruleStack').onclick = () => { rules.stack = !rules.stack; $('ruleStack').setAttribute('aria-pressed', rules.stack); };
+  $('ruleDraw').onclick = () => { rules.drawTill = !rules.drawTill; $('ruleDraw').setAttribute('aria-pressed', rules.drawTill); };
+  $('lobbyGo').onclick = startRound;
+  $('againBtn').onclick = startRound;
+  $('lobbyBtn').onclick = () => { st = 'lobby'; $('win').hidden = true; $('table').hidden = true; $('lobby').hidden = false; $('tvRound').textContent = 'Lobby'; renderSeats(); broadcast(); };
+  addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && (st === 'lobby' || st === 'over') && players.length >= 2) startRound(); });
+  // a phone can also deal
+  const _onMsg = onMsg;
+  onMsg = function(m){ if (m && m.t === 'lc-deal' && byP(m.p) && (st === 'lobby' || st === 'over')){ startRound(); return; } _onMsg(m); };
+  showPair(); startLink(); renderSeats();
+  window.__lc = { get hands(){ return hands; }, get st(){ return st; }, get turn(){ return cur(); }, get top(){ return pile[pile.length - 1]; }, get color(){ return color; }, players };
+}
+
+// =====================================================================================
+// phone: shows your hand and sends what you want to do; the TV decides
+// =====================================================================================
+function phone(){
+  $('ph').hidden = false;
+  let pid = ''; try { pid = sessionStorage.getItem('lcPid') || ''; } catch (_) {}
+  if (!pid){ pid = Math.random().toString(36).slice(2, 10); try { sessionStorage.setItem('lcPid', pid); } catch (_) {} }
+  let name = ''; try { name = localStorage.getItem('csName') || ''; } catch (_) {}
+  let link = null, me = null, S = null, lastSt = 0, actId = 0, outbox = null, wild = null, wasTurn = false, lastSeq = -1;
+  try { actId = +(sessionStorage.getItem('lcAct') || 0); } catch (_) {}
+  const send = o => link && link.send(Object.assign({ p: pid }, o));
+  const show = id => ['phJoin', 'phWait', 'phPlay'].forEach(s => $(s).hidden = s !== id);
+  const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (_) {} };
+  $('phName').value = name;
+  try { const h = ClayLink.cleanCode(location.hash.slice(1)); if (h) $('phCode').value = h; } catch (_) {}
+
+  function join(){
+    const code = ClayLink.cleanCode($('phCode').value); if (code.length !== 4){ $('phCode').focus(); return; }
+    name = $('phName').value.trim().slice(0, 10); try { localStorage.setItem('csName', name); } catch (_) {}
+    if (link) link.close();
+    link = ClayLink.join(code, onMsg, s => { $('phLink').textContent = s === 'direct' || s === 'relay' ? 'Connected' : s === 'nohost' ? 'No TV found' : 'Connecting'; });
+    show('phWait'); $('phWaitH').textContent = 'Finding the TV'; $('phWaitP').textContent = 'Room ' + code + '. Keep the Last Card screen open on the TV.';
+  }
+  $('phGo').onclick = join;
+  $('phCode').addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
+  $('phStart').onclick = () => { send({ t: 'lc-deal' }); buzz(20); };
+  $('phName2').addEventListener('change', () => { name = $('phName2').value.trim().slice(0, 10); try { localStorage.setItem('csName', name); } catch (_) {} send({ t: 'lc-hi', name }); });
+  if ($('phCode').value.length === 4 && name) join();
+  else if ($('phCode').value.length === 4) $('phName').focus();
+
+  // every action carries a number; it is sent again until the TV says it heard it
+  function act(o){ actId++; try { sessionStorage.setItem('lcAct', actId); } catch (_) {} outbox = Object.assign({ t: 'lc-act', id: actId }, o); send(outbox); }
+  setInterval(() => {
+    if (!link) return;
+    if (!me) send({ t: 'lc-hi', name });
+    if (outbox) send(outbox);
+    if (performance.now() - lastSt > 4000) $('phLink').textContent = 'Connecting';
+  }, 700);
+
+  function onMsg(m){
+    if (!m || m.t !== 'lc-st') return;
+    lastSt = performance.now(); $('phLink').textContent = 'Connected';
+    if (outbox && m.ack && (m.ack[pid] || 0) >= outbox.id) outbox = null;
+    const mine = (m.roster || []).find(x => x.p === pid);
+    if (!mine){ me = null; $('phWaitH').textContent = 'Joining'; $('phWaitP').textContent = (m.roster || []).length >= MAXP ? 'The table is full. Eight players at a time.' : 'Saying hello to the TV.'; return; }
+    me = mine; S = m;
+    $('phDot').style.background = SEAT[me.seat]; $('phMe').textContent = me.name;
+    if (!$('phName2').value) $('phName2').placeholder = 'Change name (' + me.name + ')';
+    const inGame = (m.st === 'play' || m.st === 'over') && m.hands && m.hands[pid];
+    if (!inGame){
+      show('phWait');
+      if (m.st === 'play'){ $('phWaitH').textContent = 'Game in progress'; $('phWaitP').textContent = "You'll be dealt in next round."; $('phStart').hidden = true; }
+      else { $('phWaitH').textContent = "You're in"; $('phWaitP').textContent = m.roster.length < 2 ? 'Waiting for at least one more player.' : m.roster.length + ' players at the table. Anyone can deal.'; $('phStart').hidden = m.roster.length < 2; }
+      return;
+    }
+    show('phPlay');
+    if (m.seq !== lastSeq || !outbox) render();
+    lastSeq = m.seq;
+  }
+
+  function nm(p){ const r = S.roster.find(x => x.p === p); return r ? r.name : 'Someone'; }
+  function canPlay(c){
+    const top = S.top;
+    if (S.drawn && S.drawn.p === pid && S.drawn.c !== c) return false;
+    if (S.pending){ if (!S.rules.stack) return false; return val(c) === 'f' || (val(top) === 'd' && val(c) === 'd'); }
+    if (isWild(c)) return true;
+    return c[0] === S.color || (!isWild(top) && val(c) === val(top));
+  }
+  const ORDER = 'rytpw', VORD = '0123456789svdwf';
+  function render(){
+    const hand = (S.hands[pid] || []).slice().sort((a, b) => ORDER.indexOf(a[0]) - ORDER.indexOf(b[0]) || VORD.indexOf(a[1]) - VORD.indexOf(b[1]));
+    const myTurn = S.st === 'play' && S.turn === pid;
+    if (myTurn && !wasTurn) buzz([40, 60, 40]);
+    wasTurn = myTurn;
+    $('phTopCard').innerHTML = cardHTML(S.top);
+    const tc = $('phTopCard').firstChild; if (tc && isWild(S.top)) tc.querySelector('.face').style.boxShadow = `inset 0 0 0 6px ${COL[S.color]}`;
+    $('phTop').classList.toggle('mine', myTurn);
+    if (S.st === 'over'){ $('phTurn').textContent = S.winner === pid ? 'You win!' : nm(S.winner) + ' wins'; $('phSub').textContent = 'Deal again from the TV or below.'; }
+    else if (myTurn){ $('phTurn').textContent = S.pending ? 'Take +' + S.pending + ' or stack' : 'Your turn'; $('phSub').textContent = 'Color: ' + COLNAME[S.color] + (S.drawn ? ' · play it or keep it' : ''); }
+    else { $('phTurn').textContent = nm(S.turn) + "'s turn"; $('phSub').textContent = 'Color: ' + COLNAME[S.color] + ' · ' + (S.dir > 0 ? 'clockwise' : 'reversed'); }
+    $('phMsg').textContent = S.ev || '';
+    $('hand').innerHTML = hand.map(c => {
+      const ok = myTurn && canPlay(c), isDrawn = S.drawn && S.drawn.p === pid && S.drawn.c === c;
+      return cardHTML(c, (isDrawn ? 'drawn' : ok ? 'ok' : myTurn ? 'no' : ''));
+    }).join('');
+    $('drawBtn').hidden = !myTurn || !!(S.drawn && S.drawn.p === pid);
+    $('drawBtn').textContent = S.pending ? 'Take +' + S.pending : 'Draw';
+    $('keepBtn').hidden = !(myTurn && S.drawn && S.drawn.p === pid);
+    const n = hand.length;
+    $('lastBtn').hidden = S.st !== 'play' || S.called[pid] || !((n === 2 && myTurn) || (n === 1 && S.exposed === pid));
+    $('catchBtn').hidden = !(S.st === 'play' && S.exposed && S.exposed !== pid);
+    if (!$('catchBtn').hidden) $('catchBtn').textContent = 'Catch ' + nm(S.exposed) + '! They forgot';
+    $('phStart').hidden = false; $('phStart').textContent = 'Deal again';
+    if (S.st === 'over'){ $('phBtns').hidden = true; $('lastBtn').hidden = true; $('catchBtn').hidden = true; $('hand').insertAdjacentHTML('afterend', ''); showOver(); }
+    else $('phBtns').hidden = false;
+  }
+  function showOver(){ if (!$('phPlay').querySelector('#againP')) { const b = document.createElement('button'); b.id = 'againP'; b.className = 'red'; b.textContent = 'Deal again'; b.onclick = () => { send({ t: 'lc-deal' }); b.remove(); }; $('phPlay').appendChild(b); } }
+
+  $('hand').addEventListener('click', e => {
+    const el = e.target.closest('.card'); if (!el || !S || S.st !== 'play' || S.turn !== pid) return;
+    const c = el.dataset.c; if (!canPlay(c)){ buzz([20, 30, 20]); el.animate([{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'none' }], 240); return; }
+    if (isWild(c)){ wild = c; $('pick').hidden = false; return; }
+    el.style.transform = 'translateY(-60px)'; el.style.opacity = '0';
+    buzz(15); act({ a: 'play', c });
+  });
+  $('pick').addEventListener('click', e => { const b = e.target.closest('[data-c]'); if (!b || !wild) return; $('pick').hidden = true; act({ a: 'play', c: wild, col: b.dataset.c }); wild = null; buzz(15); });
+  $('pickX').onclick = () => { $('pick').hidden = true; wild = null; };
+  $('drawBtn').onclick = () => { act({ a: 'draw' }); buzz(10); };
+  $('keepBtn').onclick = () => { act({ a: 'keep' }); };
+  $('lastBtn').onclick = () => { act({ a: 'last' }); buzz([30, 30, 60]); $('lastBtn').hidden = true; };
+  $('catchBtn').onclick = () => { act({ a: 'catch' }); buzz(60); $('catchBtn').hidden = true; };
+  // remove the deal-again button once a new round starts
+  setInterval(() => { const b = $('againP'); if (b && S && S.st === 'play') b.remove(); }, 500);
+  window.__lcPhone = { get S(){ return S; }, act, canPlay: c => canPlay(c), pid };
+}
+
+if (/[?&]phone\b/.test(location.search)) phone(); else tv();
+})();
+</script>
+</body></html>
