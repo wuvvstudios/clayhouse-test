@@ -547,13 +547,33 @@ function make(look, o){
   // body height (model units) for scaling
   fig.root.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(fig.root); fig.height = bb.max.y - Math.min(0, bb.min.y);
   // morphs: face shape from the look, expressions on top
+  // teeth: the kit's teeth sat small and deep, and poked through the lips on some faces. They are replaced by one clean
+  // upper row: a curved white arch just behind the upper lip, so a smile or an open mouth shows real teeth
+  { const hs = P.head_skin, mo = P.mouth;
+    if (mo && Array.isArray(mo.material)) mo.material.forEach(m => { if (m && m.name === 'teeth') m.visible = false; });
+    if (hs && hs.geometry.index && Array.isArray(hs.material)){
+      const g = hs.geometry, pa = g.attributes.position, I = g.index.array, mi = hs.material.findIndex(m => m && m.name === 'mouthIn'), q = g.groups.find(x => x.materialIndex === mi);
+      if (q){ const b = new THREE.Box3(), v = new V3(); for (let i = q.start; i < q.start + q.count; i++){ v.fromBufferAttribute(pa, I[i]); b.expandByPoint(v); }
+        const w = (b.max.x - b.min.x) * 0.8, R = w * 0.75, th = 2 * Math.asin(Math.min(0.99, w / 2 / R)), h = 0.0125;
+        const geo = new THREE.CylinderGeometry(R, R, h, 24, 1, false, Math.PI - th / 2 + Math.PI, th);
+        const tc2 = document.createElement('canvas'); tc2.width = 256; tc2.height = 32; { const x = tc2.getContext('2d'); x.fillStyle = '#f6f1e7'; x.fillRect(0, 0, 256, 32); x.fillStyle = 'rgba(150,120,100,.45)'; for (let k = 1; k < 8; k++) x.fillRect(k * 32 - 1, 6, 2, 26); }
+        const tt = new THREE.CanvasTexture(tc2); tt.encoding = THREE.sRGBEncoding;
+        const tm = new THREE.MeshStandardMaterial({ map: tt, roughness: 0.35 }); tm.name = 'teethRow';
+        const t = new THREE.Mesh(geo, tm); t.name = 'teethRow';
+        t.position.set((b.min.x + b.max.x) / 2, b.max.y - h / 2 + 0.0002, b.max.z - 0.011 - R); head.add(t); fig.teethRow = t; } } }
   fig.morph = morphable(head);
   const W0 = {}; for (const s of SHAPES) W0['s_' + s.key] = L.shape[s.key] || 0;
   for (const [k, v] of Object.entries((EYESHAPES[L.eyeShape] || EYESHAPES[0]).v)) W0['s_' + k] = (W0['s_' + k] || 0) + v;
   for (const [k, v] of Object.entries((LIPSHAPES[L.lipShape] || LIPSHAPES[0]).v)) W0['s_' + k] = (W0['s_' + k] || 0) + v;
   fig.expr = '';
-  fig.setExpr = kind => { if (fig.expr === kind) return; fig.expr = kind; const E = EXPR[kind] || EXPR.calm, W = Object.assign({}, W0, E); fig.morph.apply(W);
-    if (M.teeth) M.teeth.visible = (W.x_jawOpen || 0) > 0.07; if (M.mouthIn) M.mouthIn.visible = (W.x_jawOpen || 0) > 0.02 || (W.x_smileL || 0) + (W.x_smileR || 0) > 0.6; };
+  // show the inside of the mouth and the teeth whenever the lips part: opening the jaw or a real smile
+  const mouthVis = W => { const open = W.x_jawOpen || 0, sm = ((W.x_smileL || 0) + (W.x_smileR || 0)) / 2;
+    // by name on the meshes themselves: the games swap the figure's materials, so the original ones would be the wrong objects
+    const iv = open > 0.02 || sm > 0.3;
+    for (const n of ['mouth', 'head_skin']){ const o = P[n]; if (!o) continue; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (!m) return; if (m.name === 'teeth') m.visible = false; if (m.name === 'mouthIn') m.visible = iv; }); }
+    if (fig.teethRow) fig.teethRow.visible = iv; };
+  fig.setExpr = kind => { if (fig.expr === kind) return; fig.expr = kind; const E = EXPR[kind] || EXPR.calm, W = Object.assign({}, W0, E); fig.morph.apply(W); mouthVis(W); };
+  fig.setFace = W => { fig.expr = 'live'; fig.morph.apply(W); mouthVis(W); };   // live face (the face mirror): weights straight from the camera
   fig.setExpr('calm');
   const env = envFor(o.renderer);
   const mats = new Set(); fig.root.traverse(c => { if (c.isMesh) [].concat(c.material).forEach(m => mats.add(m)); });

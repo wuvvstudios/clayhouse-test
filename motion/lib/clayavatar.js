@@ -227,7 +227,7 @@ function FIGBUILD(spec, shirt) {
       c.traverse(function (m) { if (m.isMesh) { m.material = Array.isArray(m.material) ? m.material.map(figMat) : figMat(m.material); m.frustumCulled = false; } });
     });
     rig.fig = fig;
-    if (fig.setExpr) fig.setExpr('calm');
+    if (fig.setExpr){ fig.expr = ''; fig.setExpr('calm'); }
   };
   if (FIGREADY) attach(); else CF.ready.then(attach);
   return rig;

@@ -142,8 +142,8 @@ header .vt{ font-size:26px; flex:1 }
 <div id="toast" class="glass"></div>
 <script src="lib/three.min.js"></script>
 <script src="lib/clayfigure_data.js"></script>
-<script src="lib/clayfigure.js?v=2"></script>
-<script src="lib/clayavatar.js"></script>
+<script src="lib/clayfigure.js?v=4"></script>
+<script src="lib/clayavatar.js?v=3"></script>
 <script src="lib/qrcode.js"></script>
 <script src="figpass.js?v=1"></script>
 <script>
@@ -233,7 +233,7 @@ function loop(now){
   if (av.play && av.hasAnim && av.hasAnim('Idle_Loop')){ av.play('Idle_Loop', {}); av.animate(dt); }
   const fig = av.rig && av.rig.fig;
   if (mirrorOn && fig){
-    if (MX.W && fig.morph) fig.morph.apply(MX.W);
+    if (MX.W) (fig.setFace ? fig.setFace(MX.W) : fig.morph && fig.morph.apply(MX.W));
     // the turn is shared between the neck and the head so the neck bends with it instead of the head sliding off
     for (const [j, f] of [[av.neck, 0.45], [av.head, 0.55]]) if (j){ j.rotation.x += (MX.pitch * f - j.rotation.x) * 0.5; j.rotation.y += (MX.yaw * f - j.rotation.y) * 0.5; j.rotation.z += (MX.roll * f - j.rotation.z) * 0.5; }
   }
