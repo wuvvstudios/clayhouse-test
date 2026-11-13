@@ -4136,7 +4136,7 @@ window.WuvvTee = (function () {
     if (!T || !AV || !AV.make || !window.ClayFigure){ if ((n || 0) < 120) setTimeout(() => liveFigure((n || 0) + 1), 500); return; }
     if (!window.WuvvTee && window.__wuvvTeeInit) try { window.__wuvvTeeInit(); } catch (e) { console.warn('wuvv tee init', e); }
     const btn = q('#vhMe'), im = q('#vhMeImg'), W = 427, H = 640;
-    let av; try { av = AV.make(AV.specs({ players: 1 }, 1)[0], { height: 1.8, shirt: window.WuvvTee ? WuvvTee.CREAM : '#74E0CF' }); } catch (e) { console.warn('home figure', e); return; }
+    let av; try { av = AV.make(AV.specs({ players: 1 }, 1)[0], { height: 1.8, shirt: '#74E0CF' }); } catch (e) { console.warn('home figure', e); return; }
     const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2; cv.style.cssText = `width:${W}px;height:${H}px;display:none;pointer-events:none`;
     btn.insertBefore(cv, im);
     const r = new T.WebGLRenderer({ canvas: cv, alpha: true, antialias: true }); r.setPixelRatio(1); r.setSize(W * 2, H * 2, false);
@@ -4150,7 +4150,7 @@ window.WuvvTee = (function () {
       requestAnimationFrame(frame);
       if (root.hidden) return;
       const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000), t = now / 1000; last = now;
-      if (!LIVE.on){ if (av.rig && av.rig.fig){ LIVE.on = true; try { if (window.WuvvTee) WuvvTee.dress(av); } catch (e) { console.warn('wuvv tee', e); } cv.style.display = 'block'; im.style.display = 'none'; } else return; }
+      if (!LIVE.on){ if (av.rig && av.rig.fig){ LIVE.on = true; cv.style.display = 'block'; im.style.display = 'none'; } else return; }
       // whole-body tracking from the camera: the first person in view drives the figure, mirrored like a mirror
       let lm = null; try { const b = window.__arcadeHome && window.__arcadeHome.bodies && window.__arcadeHome.bodies(); if (b && b.length) lm = b[0]; } catch (_) {}
       if (lm) av.track(lm, 1);
