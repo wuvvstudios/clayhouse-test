@@ -3262,6 +3262,8 @@ show('pick');
 #vh .pack.cardbox .pack-body{box-shadow:inset 0 -5px 0 rgba(0,0,0,0.14),inset 0 2px 0 rgba(255,255,255,0.35),-30px 40px 56px -24px rgba(30,34,90,0.6)}
 #vh .phonelid{transform:translateZ(3px);transition:transform .9s cubic-bezier(.25,.8,.25,1),opacity .5s ease .4s}
 #vh .phonelid.popped{transform:translateZ(60px) translateY(-560px) rotateX(-8deg);opacity:0}
+
+html.ax-on #vh .vh-fig{left:150px!important}
 /* Vintage theme for the rest of the Arcade: the same toy-box look as the home screen (sunburst blue, cream cards with
    black outlines and hard shadows, gold Bungee headings, a red primary button) */
 :root{
@@ -3605,16 +3607,16 @@ html body .moves b{color:var(--vt-red)}
     </div>
     <div id="vhPacks" style="position:absolute;inset:0;perspective:2200px;perspective-origin:1000px 430px">${LIST.map(packHTML).join('')}</div>
     <div class="runner" id="vhRunner" aria-hidden="true" hidden><img alt="" style="height:360px;width:240px;display:block"></div>
-    <section aria-label="Your figure" style="position:absolute;left:40px;top:170px;width:620px;height:890px;z-index:220">
+    <section aria-label="Your figure" class="vh-fig" style="position:absolute;left:40px;top:170px;width:620px;height:890px;z-index:220">
       <div aria-hidden="true" style="position:absolute;left:60px;bottom:66px;width:480px;height:80px;border-radius:50%;background:radial-gradient(closest-side,rgba(5,10,30,0.45),rgba(5,10,30,0))"></div>
       <button class="me" id="vhMe" type="button" data-hand aria-label="Your figure, tap to wave" style="position:absolute;left:90px;bottom:84px;width:427px;height:640px;border:0;padding:0;background:transparent;display:flex;align-items:flex-end;justify-content:center">
         <img id="vhMeImg" alt="" style="height:640px;width:427px;display:block">
         <span class="hint" style="position:absolute;top:120px;right:-60px;border-radius:999px;padding:9px 14px;font-size:15px;font-weight:700;white-space:nowrap;background:#1B1B1B;border:2px solid #F3E6C8;color:#F3E6C8">Customizing comes next</span>
       </button>
-      <div style="position:absolute;left:8px;bottom:0;display:flex;align-items:center;gap:14px">
-        <div class="glass" style="border-radius:20px;padding:12px 20px"><div style="font-family:'Bungee',sans-serif;font-size:20px">Player 1</div><div id="vhStatus" style="font-size:15px;color:#3A2A10;font-weight:500;text-transform:uppercase;letter-spacing:0.5px">Point at a box to pick it</div></div>
-      </div>
     </section>
+    <div style="position:absolute;left:50%;top:40px;transform:translateX(-50%);z-index:230;display:flex;align-items:center;gap:14px">
+      <div class="glass" style="border-radius:20px;padding:12px 20px;text-align:center"><div style="font-family:'Bungee',sans-serif;font-size:20px">Player 1</div><div id="vhStatus" style="font-size:15px;color:#3A2A10;font-weight:500;text-transform:uppercase;letter-spacing:0.5px">Point at a box to pick it</div></div>
+    </div>
     <div class="credits">Music: A Gentle Breeze, Parts One and Two, by Simon Cooksey. Sounds: Wuvv Studios, Kenney and Freesound (CC0).</div>
   </div>`;
   document.body.appendChild(root);
@@ -3760,5 +3762,5 @@ html body .moves b{color:var(--vt-red)}
 })();
 </script>
 
-<script src="motion/aux.js?v=9"></script>
+<script src="motion/aux.js?v=10"></script>
 <script>addEventListener("load",function(){var q=new URLSearchParams(location.search).get("lab");if(!q)return;var id=q+"-lab",gi=(typeof GAME_LIST!=="undefined"?GAME_LIST:[]).findIndex(function(g){return g.id===id;});if(gi>=0)setTimeout(function(){if(window.__arcadeHome)window.__arcadeHome.openGame(gi);},1700);});</script>

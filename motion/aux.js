@@ -20,11 +20,16 @@
   // It finds open space on whatever screen is showing (no buttons, text, cards or pictures under it) and sits there.
   // Shapes, roomiest first: player beside its card, player above its card, player alone. Idle: the QR card.
   const css = `
-  #clayAux{ position:fixed; left:14px; top:auto; bottom:14px; z-index:2147483000; font-family:'Oswald','Arial Narrow',sans-serif; color:#1B1B1B; display:flex; gap:10px; pointer-events:none; transition:left .35s ease, top .35s ease, opacity .25s ease }
+  #clayAux{ position:fixed; left:14px; bottom:14px; z-index:2147483000; font-family:'Oswald','Arial Narrow',sans-serif; color:#1B1B1B; display:flex; gap:10px; pointer-events:none; transition:left .35s ease, top .35s ease, opacity .25s ease }
   #clayAux.ax-H{ flex-direction:row; align-items:flex-end } #clayAux.ax-V{ flex-direction:column; width:212px } #clayAux.ax-P .ax-card{ display:none }
   #clayAux *{ box-sizing:border-box }
   #clayAux .ax-card{ pointer-events:none; background:#F3E6C8; border:3px solid #1B1B1B; border-radius:16px; box-shadow:5px 5px 0 #1B1B1B; padding:10px 12px; display:flex; align-items:center; gap:10px; width:222px }
-  #clayAux.ax-V .ax-card{ width:212px } #clayAux.ax-Q .ax-card,#clayAux.ax-Qs .ax-card{ width:auto }
+  #clayAux.ax-V .ax-card{ width:212px } #clayAux.ax-Q .ax-card{ width:auto }
+  #clayAux.ax-QV .ax-card{ width:212px } #clayAux.ax-QV .ax-idle{ flex-direction:column; text-align:center }
+  /* each screen keeps the bottom-left corner clear for the aux */
+  html.ax-on #tv{ padding-bottom:240px !important }
+  html.ax-on .pausebtn{ left:auto !important; right:12px !important }
+  html.ax-on #status{ text-align:right }
   #clayAux .ax-idle{ display:flex; align-items:center; gap:10px; width:auto }
   #clayAux.ax-Qs .ax-idle .ax-txt{ display:none }
   #clayAux .ax-qr{ width:96px; height:96px; flex:none; background:#fff; border:2px solid #1B1B1B; border-radius:8px; padding:5px }
@@ -46,79 +51,25 @@
     const box = document.createElement('div'); box.id = 'clayAux'; box.className = 'ax-H'; box.setAttribute('aria-live', 'polite');
     box.innerHTML = `<div class="ax-player" id="axPlayer" hidden><div id="axYT"></div></div><div class="ax-card" id="axCard"></div>`;
     document.body.appendChild(box);
-    render(); place(true);
+    document.documentElement.classList.add('ax-on'); render(); place();
   }
 
-  // ---------- finding open space ----------
-  const UI_TAGS = { BUTTON: 1, A: 1, INPUT: 1, SELECT: 1, TEXTAREA: 1, IMG: 1, SVG: 1, VIDEO: 1, LABEL: 1, H1: 1, H2: 1, H3: 1, H4: 1, P: 1, LI: 1 };
-  function solid(cs){
-    if (cs.backgroundImage && cs.backgroundImage !== 'none') return true;
-    const m = /rgba?\(([^)]+)\)/.exec(cs.backgroundColor); if (m){ const a = m[1].split(',')[3]; if (a === undefined || +a > 0.15) return true; }
-    return parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderLeftWidth) > 0 || (cs.boxShadow && cs.boxShadow !== 'none');
+  // ---------- its spot: always the bottom-left corner. Each screen keeps that corner clear (rules below) ----------
+  // On the home screen it stands up tall (video over its card) so the figure has room; everywhere else it lies flat.
+  let spot = null;
+  function place(){
+    const box = document.getElementById('clayAux'); if (!box) return;
+    const vh = document.getElementById('vh'), home = !!(vh && !vh.hidden && getComputedStyle(vh).display !== 'none' && getComputedStyle(vh).visibility !== 'hidden');
+    const playing = !!S.q[0], cls = playing ? (home ? 'ax-V' : 'ax-H') : (home ? 'ax-QV' : 'ax-Q');
+    if (box.className !== cls) box.className = cls;
+    document.documentElement.classList.toggle('ax-home', home);
   }
-  function collect(doc, ox, oy, out, A){
-    const all = doc.body ? doc.body.getElementsByTagName('*') : [];
-    for (let i = 0; i < all.length; i++){
-      const el = all[i]; if (el.id === 'clayAux' || el.closest && el.closest('#clayAux')) continue;
-      const tag = el.tagName.toUpperCase(); if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'CANVAS' || tag === 'BR') continue;
-      const r = el.getBoundingClientRect(); if (r.width < 6 || r.height < 6) continue;
-      if (r.right + ox < 0 || r.bottom + oy < 0 || r.left + ox > innerWidth || r.top + oy > innerHeight) continue;
-      if (tag === 'IFRAME'){ try { const d = el.contentDocument; if (d && d.body) collect(d, ox + r.left, oy + r.top, out, A); } catch (_) {} continue; }
-      if (r.width * r.height > A * 0.3) continue;                       // a whole-screen layer or the game canvas area, not a thing
-      let hit = UI_TAGS[tag] || el.hasAttribute('data-hand') || el.getAttribute('role') === 'button';
-      if (!hit){ for (let n = el.firstChild; n; n = n.nextSibling) if (n.nodeType === 3 && n.textContent.trim()){ hit = true; break; } }
-      const cs = (el.ownerDocument.defaultView || window).getComputedStyle(el);
-      if (cs.visibility === 'hidden' || +cs.opacity < 0.05 || cs.display === 'none') continue;
-      if (hit && !UI_TAGS[tag] && !solid(cs)){ const m = /rgba\(([^)]+)\)/.exec(cs.color); if (m && +m[1].split(',')[3] < 0.35) hit = false; }   // faint watermark lettering is backdrop
-      if (!hit) hit = solid(cs) && !!(el.textContent || '').trim();    // a card or panel with something in it (plain stripes and backdrops are fine to sit on)
-      if (!hit) continue;
-      // skip things hidden behind another screen: one of a few points on it has to be the top thing there
-      let seen = cs.pointerEvents === 'none';   // click-through labels cannot be tested this way, so they count as showing
-      if (!seen) for (const [fx, fy] of [[0.5, 0.5], [0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8]]){
-        const t = doc.elementFromPoint(r.left + r.width * fx, r.top + r.height * fy);
-        if (t && (t === el || el.contains(t) || t.contains(el) && t.tagName.toUpperCase() === 'IFRAME')){ seen = true; break; }
-      }
-      if (seen) out.push([r.left + ox, r.top + oy, r.right + ox, r.bottom + oy]);
-    }
-  }
-  function sizes(){
-    const playing = !!S.q[0];
-    if (!playing) return [['ax-Q', 330, 130], ['ax-Qs', 128, 130]];
-    return [['ax-H', 444, 212], ['ax-V', 212, 330], ['ax-P', 212, 212]];
-  }
-  let spot = null, lastPlace = 0;
-  function place(force){
-    const box = document.getElementById('clayAux'); if (!box || innerWidth <= 600) return;
-    const now = performance.now(); if (!force && now - lastPlace < 900) return; lastPlace = now;
-    const obs = []; try { collect(document, 0, 0, obs, innerWidth * innerHeight); } catch (_) {}
-    const M = 14, pad = 10, W = innerWidth, H = innerHeight;
-    const free = (x, y, w, h) => { if (x < M - 1 || y < M - 1 || x + w > W - M + 1 || y + h > H - M + 1) return false;
-      for (const o of obs) if (x < o[2] + pad && x + w > o[0] - pad && y < o[3] + pad && y + h > o[1] - pad) return false; return true; };
-    const shapes = sizes();
-    // keep the current spot while it stays clear, so the player does not wander around
-    if (spot && spot.playing === !!S.q[0]){ const sh = shapes.find(s => s[0] === spot.cls); if (sh && free(spot.x, spot.y, sh[1], sh[2])) return apply(box, spot); }
-    let best = null;
-    for (const [cls, w, h] of shapes){
-      const cands = [[M, H - M - h], [W - M - w, H - M - h], [W - M - w, M], [M, M]];
-      for (let y = H - M - h; y >= M; y -= 24) for (let x = M; x <= W - M - w; x += 24) cands.push([x, y]);   // then anywhere, nearest the bottom-left first
-      for (const [x, y] of cands) if (free(x, y, w, h)){ best = { cls, x, y, playing: !!S.q[0] }; break; }
-      if (best) break;
-    }
-    if (!best){ const sh = shapes[shapes.length - 1]; best = { cls: sh[0], x: M, y: H - M - sh[2], playing: !!S.q[0] }; }   // nowhere is clear: the smallest shape in the corner
-    spot = best; apply(box, best);
-  }
-  function apply(box, sp){
-    const want = 'ax-' + sp.cls.slice(3);
-    if (box.className !== want){ box.className = want; }
-    box.style.left = sp.x + 'px'; box.style.top = sp.y + 'px'; box.style.bottom = 'auto';
-  }
-  setInterval(() => place(false), 1000);
-  addEventListener('resize', () => { spot = null; place(true); });
+  setInterval(place, 500);
   function url(){ return (location.protocol === 'https:' ? new URL('aux.html', BASE).href : ONLINE) + '#' + S.code; }
   function render(){
     const card = document.getElementById('axCard'); if (!card) return;
     const cur = S.q[0];
-    if (spot && spot.playing !== !!cur){ spot = null; setTimeout(() => place(true), 0); }
+    setTimeout(place, 0);
     document.getElementById('axPlayer').hidden = !cur;
     if (!cur){
       let qr = '';
