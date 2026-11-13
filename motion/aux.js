@@ -17,56 +17,59 @@
   let link = null, player = null, ready = false, loadedId = '', muteBlocked = false, lastBeat = 0;
 
   // ---------- the widget ----------
+  // The aux lives in its own strip down the left side of the TV. The page itself is shrunk into the space on the right,
+  // so the player never sits on top of anything.
+  const SIDE = 250;
   const css = `
-  #clayAux{ position:fixed; left:18px; bottom:18px; z-index:2147483000; transition:opacity .25s ease; font-family:'Oswald','Arial Narrow',sans-serif; color:#1B1B1B; display:flex; align-items:flex-end; gap:12px; pointer-events:none }
+  #clayAux{ position:fixed; left:0; top:0; bottom:0; width:${SIDE}px; z-index:2147483000; font-family:'Oswald','Arial Narrow',sans-serif; color:#1B1B1B;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:16px 14px; pointer-events:none;
+    background:repeating-linear-gradient(135deg,rgba(255,255,255,.035) 0 10px,transparent 10px 20px),#1B1B1B; box-shadow:inset -3px 0 0 #000 }
   #clayAux *{ box-sizing:border-box }
-  #clayAux .ax-card{ pointer-events:none; background:#F3E6C8; border:3px solid #1B1B1B; border-radius:16px; box-shadow:5px 5px 0 #1B1B1B; padding:10px 12px; display:flex; align-items:center; gap:12px }
-  #clayAux .ax-qr{ width:70px; height:70px; background:#fff; border:2px solid #1B1B1B; border-radius:8px; padding:5px }
+  #clayAux .ax-card{ width:100%; background:#F3E6C8; border:3px solid #1B1B1B; border-radius:16px; box-shadow:4px 4px 0 #000; padding:14px 12px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px }
+  #clayAux .ax-qr{ width:150px; height:150px; background:#fff; border:2px solid #1B1B1B; border-radius:10px; padding:8px }
   #clayAux .ax-qr svg{ width:100%; height:100% }
-  #clayAux .ax-t{ font-family:'Bungee',Impact,sans-serif; font-size:18px; line-height:1.05 }
-  #clayAux .ax-s{ font-size:14px; opacity:.8; line-height:1.25; max-width:230px }
-  #clayAux .ax-code{ font-family:'Bungee',Impact,sans-serif; font-size:22px; letter-spacing:.12em }
-  #clayAux .ax-player{ pointer-events:none; width:200px; height:200px; border:3px solid #1B1B1B; border-radius:14px; overflow:hidden; box-shadow:5px 5px 0 #1B1B1B; background:#000 }
+  #clayAux .ax-t{ font-family:'Bungee',Impact,sans-serif; font-size:20px; line-height:1.05 }
+  #clayAux .ax-s{ font-size:14px; opacity:.8; line-height:1.25 }
+  #clayAux .ax-code{ font-family:'Bungee',Impact,sans-serif; font-size:24px; letter-spacing:.12em }
+  #clayAux .ax-player{ width:212px; height:212px; border:3px solid #F3E6C8; border-radius:14px; overflow:hidden; background:#000; flex:none }
   #clayAux .ax-player iframe,#clayAux .ax-player > div{ width:100%; height:100% }
-  #clayAux .ax-now{ max-width:300px }
-  #clayAux .ax-now b{ display:block; font-family:'Bungee',Impact,sans-serif; font-weight:400; font-size:17px; line-height:1.1; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical }
-  #clayAux .ax-bar{ height:6px; border-radius:4px; background:rgba(27,27,27,.15); overflow:hidden; margin-top:6px } #clayAux .ax-bar i{ display:block; height:100%; width:0; background:#D8402B }
-  #clayAux .ax-tap{ pointer-events:auto; cursor:pointer; background:#D8402B; color:#F3E6C8; font-family:'Bungee',Impact,sans-serif; font-size:15px; padding:6px 10px; border:2px solid #1B1B1B; border-radius:999px; margin-top:6px; display:inline-block }
-  #clayAux[data-min="1"] .ax-big{ display:none }
+  #clayAux .ax-now{ width:100% }
+  #clayAux .ax-now b{ display:block; font-family:'Bungee',Impact,sans-serif; font-weight:400; font-size:17px; line-height:1.1; overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; margin:4px 0 }
+  #clayAux .ax-bar{ height:6px; border-radius:4px; background:rgba(27,27,27,.15); overflow:hidden; margin:6px 0 } #clayAux .ax-bar i{ display:block; height:100%; width:0; background:#D8402B }
+  #clayAux .ax-tap{ pointer-events:auto; cursor:pointer; background:#D8402B; color:#F3E6C8; font-family:'Bungee',Impact,sans-serif; font-size:15px; padding:8px 12px; border:2px solid #1B1B1B; border-radius:999px; margin-top:6px; display:inline-block }
+  #clayAux .ax-mini{ width:84px; height:84px; background:#fff; border:2px solid #1B1B1B; border-radius:8px; padding:5px; margin:2px auto 0 } #clayAux .ax-mini svg{ width:100%; height:100% }
   #clayAux iframe{ pointer-events:none }
-  #clayAux.ghost{ opacity:.12 }
-  @media (max-width:600px){ #clayAux{ display:none } }`;
+  html.ax-dock body{ transform-origin:100% 0; transform:translate(0,var(--axy)) scale(var(--axk)); min-height:100vh }
+  @media (max-width:600px){ #clayAux{ display:none } html.ax-dock body{ transform:none } }`;
+  let K = 1, GY = 0;
+  function dock(){
+    const w = innerWidth, h = innerHeight; if (w <= 600){ K = 1; GY = 0; document.documentElement.classList.remove('ax-dock'); return; }
+    K = (w - SIDE) / w; GY = h * (1 - K) / 2;
+    const r = document.documentElement; r.style.setProperty('--axk', K); r.style.setProperty('--axy', GY + 'px'); r.classList.add('ax-dock');
+  }
+  // pages that hit-test in their own layout coordinates (the camera hand pointer) still find the right element
+  const efp = document.elementFromPoint.bind(document);
+  document.elementFromPoint = function (x, y){ if (K === 1) return efp(x, y); return efp(innerWidth - (innerWidth - x) * K, GY + y * K); };
+  addEventListener('resize', dock);
   function mount(){
     if (document.getElementById('clayAux')) return;
     const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
     const box = document.createElement('div'); box.id = 'clayAux'; box.setAttribute('aria-live', 'polite');
     box.innerHTML = `<div class="ax-player" id="axPlayer" hidden><div id="axYT"></div></div><div class="ax-card" id="axCard"></div>`;
-    document.body.appendChild(box);
-    render();
+    document.documentElement.appendChild(box);   // outside the page body, so shrinking the page leaves the strip alone
+    dock(); render();
   }
-  // the corner never blocks the game: clicks pass straight through it, and it fades out of the way whenever
-  // the mouse or the camera's hand pointer comes near it
-  let px = -1, py = -1;
-  addEventListener('pointermove', e => { px = e.clientX; py = e.clientY; }, { passive: true, capture: true });
-  setInterval(() => {
-    const box = document.getElementById('clayAux'); if (!box) return;
-    let x = px, y = py; const cur = document.getElementById('cursor');
-    if (cur && !cur.hidden && cur.offsetParent){ const c = cur.getBoundingClientRect(); x = c.left + c.width / 2; y = c.top + c.height / 2; }
-    const r = box.getBoundingClientRect(), pad = 40;
-    box.classList.toggle('ghost', !muteBlocked && x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad);
-  }, 120);
+  function qrSvg(){ try { const q = qrcode(0, 'M'); q.addData(url()); q.make(); return q.createSvgTag({ cellSize: 3, margin: 0, scalable: true }); } catch (_) { return ''; } }
   function url(){ return (location.protocol === 'https:' ? new URL('aux.html', BASE).href : ONLINE) + '#' + S.code; }
   function render(){
     const card = document.getElementById('axCard'); if (!card) return;
     const cur = S.q[0];
     document.getElementById('axPlayer').hidden = !cur;
     if (!cur){
-      let qr = '';
-      try { const q = qrcode(0, 'M'); q.addData(url()); q.make(); qr = q.createSvgTag({ cellSize: 3, margin: 0, scalable: true }); } catch (_) {}
-      card.innerHTML = `<div class="ax-qr">${qr}</div><div><div class="ax-t">Take the aux</div><div class="ax-s">Scan to play your music on the TV</div><div class="ax-code">${esc(S.code || '----')}</div></div>`;
+      card.innerHTML = `<div class="ax-t">Take the aux</div><div class="ax-qr">${qrSvg()}</div><div class="ax-s">Scan to play your music on the TV</div><div class="ax-code">${esc(S.code || '----')}</div>`;
     } else {
       card.innerHTML = `<div class="ax-now"><div class="ax-s">${S.paused ? 'Paused' : 'Now playing'}${cur.by ? ' · ' + esc(cur.by) + ' has the aux' : ''}</div><b>${esc(cur.t)}</b>`
-        + `<div class="ax-bar"><i id="axBar"></i></div><div class="ax-s">${S.q.length > 1 ? 'Up next: ' + esc(S.q[1].t) : 'Queue more from your phone'} · aux ${esc(S.code)}</div>`
+        + `<div class="ax-bar"><i id="axBar"></i></div><div class="ax-s">${S.q.length > 1 ? 'Up next: ' + esc(S.q[1].t) : 'Scan to queue more'}</div><div class="ax-mini">${qrSvg()}</div><div class="ax-code" style="font-size:18px">${esc(S.code)}</div>`
         + (muteBlocked ? '<span class="ax-tap" id="axTap">Click to turn the sound on</span>' : '') + `</div>`;
       const tap = document.getElementById('axTap'); if (tap) tap.onclick = () => { try { player.unMute(); player.setVolume(100); player.playVideo(); } catch (_) {} muteBlocked = false; render(); };
     }
