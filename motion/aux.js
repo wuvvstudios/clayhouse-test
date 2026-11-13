@@ -27,8 +27,13 @@
   #clayAux.ax-V .ax-card{ width:212px } #clayAux.ax-Q .ax-card{ width:auto }
   #clayAux.ax-QV .ax-card{ width:212px } #clayAux.ax-QV .ax-idle{ flex-direction:column; text-align:center }
   /* each screen keeps the bottom-left corner clear for the aux */
-  html.ax-on #tv{ padding-bottom:var(--axh,240px) !important; transition:padding .3s ease }
-  html.ax-on #lobby{ grid-template-columns:1fr minmax(300px,420px) !important; align-items:start !important } html.ax-on #lobby > #pair{ grid-column:2 !important; grid-row:1 / span 4 } html.ax-on #lobby > :not(#pair){ grid-column:1 !important }
+  html.ax-on #tv:has(#lobby[hidden]){ padding-bottom:var(--axh,240px) !important }
+  html.ax-on #lobby{ grid-template-columns:1fr minmax(260px,min(420px,32vw)) !important; align-items:start !important } html.ax-on #lobby > #pair{ grid-column:2 !important; grid-row:1 / span 4 } html.ax-on #lobby > :not(#pair){ grid-column:1 !important } html.ax-on #qr{ max-width:min(280px,34vh) !important } html.ax-on #tvUrl{ word-break:break-all }
+  /* a narrow or short window: the lobby stacks up and scrolls, and keeps the corner free under the aux */
+  @media (max-width:1000px), (max-height:640px){ html.ax-on #tv{ padding-left:var(--axw,160px) !important; overflow-y:auto !important } }
+  @media (max-width:1000px){
+    html.ax-on #lobby{ grid-template-columns:1fr !important } html.ax-on #lobby > #pair{ grid-column:1 !important; grid-row:auto !important; max-width:420px; justify-self:center }
+  }
   html.ax-on .pausebtn{ left:auto !important; right:12px !important }
   html.ax-on #status{ text-align:right }
   #clayAux .ax-sq{ width:212px; height:212px; flex:none; background:#fff; border:3px solid #1B1B1B; border-radius:14px; box-shadow:5px 5px 0 #1B1B1B; padding:14px } #clayAux .ax-sq svg{ width:100%; height:100%; display:block } #clayAux .ax-sq[hidden]{ display:none }
@@ -41,13 +46,13 @@
   #clayAux .ax-t{ font-family:'Bungee',Impact,sans-serif; font-size:17px; line-height:1.05 }
   #clayAux .ax-s{ font-size:13px; opacity:.8; line-height:1.25; max-width:200px }
   #clayAux .ax-code{ font-family:'Bungee',Impact,sans-serif; font-size:20px; letter-spacing:.12em }
-  #clayAux .ax-player{ pointer-events:none; width:212px; height:212px; flex:none; border:3px solid #1B1B1B; border-radius:14px; overflow:hidden; box-shadow:5px 5px 0 #1B1B1B; background:#000 }
+  #clayAux .ax-player{ pointer-events:auto; width:212px; height:212px; flex:none; border:3px solid #1B1B1B; border-radius:14px; overflow:hidden; box-shadow:5px 5px 0 #1B1B1B; background:#000 }
   #clayAux .ax-player iframe,#clayAux .ax-player > div{ width:100%; height:100% }
   #clayAux .ax-now{ width:100% }
   #clayAux .ax-now b{ display:block; font-family:'Bungee',Impact,sans-serif; font-weight:400; font-size:16px; line-height:1.1; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical }
   #clayAux .ax-bar{ height:6px; border-radius:4px; background:rgba(27,27,27,.15); overflow:hidden; margin-top:6px } #clayAux .ax-bar i{ display:block; height:100%; width:0; background:#D8402B }
   #clayAux .ax-tap{ pointer-events:auto; cursor:pointer; background:#D8402B; color:#F3E6C8; font-family:'Bungee',Impact,sans-serif; font-size:15px; padding:6px 10px; border:2px solid #1B1B1B; border-radius:999px; margin-top:6px; display:inline-block }
-  #clayAux iframe{ pointer-events:none }
+  #clayAux .ax-player iframe{ pointer-events:auto }   /* so the YouTube Skip Ad button can be clicked */
   @media (max-width:600px){ #clayAux{ display:none } }`;
   function mount(){
     if (document.getElementById('clayAux')) return;
@@ -67,7 +72,9 @@
     const big = !!S.q[0] || Date.now() - (S.seen || 0) < 60000;   // small until a phone joins or music starts
     const cls = big ? 'ax-V' : 'ax-V ax-S';
     if (box.className !== cls) box.className = cls;
-    document.documentElement.style.setProperty('--axh', (box.offsetHeight + 28) + 'px');
+    const k = Math.max(0.72, Math.min(1.25, Math.min(innerWidth / 1600, innerHeight / 900)));   // scale with the screen so small windows stay tidy
+    if (box.style.zoom !== String(k)) box.style.zoom = k;
+    const br = box.getBoundingClientRect(); document.documentElement.style.setProperty('--axh', (br.height + 24) + 'px'); document.documentElement.style.setProperty('--axw', (br.width + 30) + 'px');
     document.documentElement.classList.toggle('ax-home', home);
   }
   setInterval(place, 500);

@@ -3196,7 +3196,7 @@ window.__arcadeTest={feed(b,dt){handlePointer(b,dt); handlePauseGesture(b,dt); h
     rate(v,barAns){ const f=document.querySelector(`#rateFaces [data-v="${v}"]`); if(!rate.isOpen()||!f) return false; f.click(); if(barAns){const b=document.querySelector(`#rateBar [data-bar="${barAns}"]`); b&&b.click();} return true; }},
   music:()=>music.state(),
   state:()=>({screen,paused,players:nPlayers,rating:rate.state(),slots:checkin.slots(),crew:activeCrew.map(c=>Object.assign({},c)),opts:lastOpts&&JSON.parse(JSON.stringify(lastOpts)),scanner:checkin.scanner()})};
-window.__arcadeHome={screen:()=>screen,openGame:gi=>makePanel(gi).click(),menuRun:on=>menu.run(on)};
+window.__arcadeHome={screen:()=>screen,openGame:gi=>makePanel(gi).click(),menuRun:on=>menu.run(on),bodies:()=>lastBodies};
 {const show0=show; show=function(id){show0(id); dispatchEvent(new CustomEvent('arcade-screen',{detail:id}));};}
 setPack(packNow);
 show('pick');
@@ -3666,6 +3666,7 @@ html body .moves b{color:var(--vt-red)}
     meImg();
   }
   function meImg(){
+    if (LIVE.on) return;
     let src; if (st.wave) src = IMG['player_' + st.wave];
     else { const r = st.reach || 0; src = r < 6 ? IMG.player_stand : IMG['player_reach' + Math.max(0, Math.min(17, Math.round((r - 5.7) / 9.77)))]; }
     const im = q('#vhMeImg'); if (src && im.getAttribute('src') !== src) im.src = src;
@@ -3697,7 +3698,7 @@ html body .moves b{color:var(--vt-red)}
   q('#vhPrev').addEventListener('click', () => go(-1)); q('#vhNext').addEventListener('click', () => go(1));
   q('#vhBack').addEventListener('click', close); q('#vhPlay').addEventListener('click', play);
   let waveT = null;
-  q('#vhMe').addEventListener('click', () => { if (waveT) clearInterval(waveT); let n = 0; set({ wave: 'wave1' }); waveT = setInterval(() => { n++; if (n >= 6){ clearInterval(waveT); waveT = null; set({ wave: null }); return; } set({ wave: n % 2 ? 'wave2' : 'wave1' }); }, 220); });
+  q('#vhMe').addEventListener('click', () => { if (LIVE.on){ LIVE.wave = performance.now() / 1000; return; } if (waveT) clearInterval(waveT); let n = 0; set({ wave: 'wave1' }); waveT = setInterval(() => { n++; if (n >= 6){ clearInterval(waveT); waveT = null; set({ wave: null }); return; } set({ wave: n % 2 ? 'wave2' : 'wave1' }); }, 220); });
   let lastWheel = 0;
   root.addEventListener('wheel', e => { if (st.open !== null) return; const now = Date.now(); if (now - lastWheel < 450 || Math.abs(e.deltaY) < 8) return; lastWheel = now; go(e.deltaY > 0 ? 1 : -1); }, { passive: true });
   addEventListener('keydown', e => {
@@ -3738,6 +3739,48 @@ html body .moves b{color:var(--vt-red)}
     const v = st.reach + (target - st.reach) * 0.25; if (Math.abs(v - st.reach) > 0.05){ st.reach = v; meImg(); }
   })();
 
+  // ---------- your figure, live: a real 3D action figure that copies your whole body when the camera sees you,
+  // breathes and looks around when it does not, and gives a proper wave when you tap it ----------
+  const LIVE = window.__vhLive = { on: false, wave: -9, dur: 2.6 };
+  (function liveFigure(n){
+    const T = window.THREE, AV = window.ClayAvatar;
+    if (!T || !AV || !AV.make || !window.ClayFigure){ if ((n || 0) < 120) setTimeout(() => liveFigure((n || 0) + 1), 500); return; }
+    const btn = q('#vhMe'), im = q('#vhMeImg'), W = 427, H = 640;
+    let av; try { av = AV.make(AV.specs({ players: 1 }, 1)[0], { height: 1.8, shirt: '#74E0CF' }); } catch (e) { console.warn('home figure', e); return; }
+    const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2; cv.style.cssText = `width:${W}px;height:${H}px;display:none;pointer-events:none`;
+    btn.insertBefore(cv, im);
+    const r = new T.WebGLRenderer({ canvas: cv, alpha: true, antialias: true }); r.setPixelRatio(1); r.setSize(W * 2, H * 2, false);
+    const sc = new T.Scene(); sc.add(new T.HemisphereLight(0xffffff, 0x445566, 1.1)); const dl = new T.DirectionalLight(0xffffff, 0.6); dl.position.set(1, 2, 3); sc.add(dl);
+    sc.add(av.root);
+    const cam = new T.PerspectiveCamera(24, W / H, 0.1, 50); cam.position.set(0, 0.98, 5.1); cam.lookAt(0, 0.92, 0);
+    const V = new T.Vector3(), Q = new T.Quaternion(), Q2 = new T.Quaternion();
+    function aimW(bone, rest, dirW, w){ bone.parent.getWorldQuaternion(Q); V.copy(dirW).normalize().applyQuaternion(Q.invert()); Q2.setFromUnitVectors(rest, V); bone.quaternion.slerp(Q2, w); bone.updateMatrixWorld(true); }
+    let last = performance.now(), rest = null;
+    function frame(){
+      requestAnimationFrame(frame);
+      if (root.hidden) return;
+      const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000), t = now / 1000; last = now;
+      if (!LIVE.on){ if (av.rig && av.rig.fig){ LIVE.on = true; cv.style.display = 'block'; im.style.display = 'none'; } else return; }
+      // whole-body tracking from the camera: the first person in view drives the figure, mirrored like a mirror
+      let lm = null; try { const b = window.__arcadeHome && window.__arcadeHome.bodies && window.__arcadeHome.bodies(); if (b && b.length) lm = b[0]; } catch (_) {}
+      if (lm) av.track(lm, 1);
+      av.update(dt, t);
+      const live = av.live && av.live();
+      if (!live && av.play && av.hasAnim && av.hasAnim('Idle_Loop')){ av.play('Idle_Loop', {}); av.animate(dt); }
+      // a friendly wave: the arm swings up, the hand waves side to side from the elbow, then it settles back down
+      const wt = t - LIVE.wave, D = LIVE.dur;
+      if (!live && wt >= 0 && wt < D){
+        const w = Math.min(1, wt / 0.3, (D - wt) / 0.35), side = -1;   // index 0 is the figure's right arm (screen left)
+        if (!rest) rest = [av.fores[0].position.clone().normalize(), av.hands[0].position.clone().normalize()];
+        const sw = Math.sin(wt * 9) * 0.55 * Math.min(1, wt / 0.4);
+        aimW(av.arms[0], rest[0], V.set(side * 0.62, 0.55, 0.28).clone(), w);
+        aimW(av.fores[0], rest[1], V.set(side * 0.08 + sw * 0.6, 1, 0.12).clone(), w);
+      }
+      r.render(sc, cam);
+    }
+    requestAnimationFrame(frame);
+  })();
+
   // ---------- tie into the Arcade ----------
   const camB = q('#vhCam'), musB = q('#vhMusic');
   camB.addEventListener('click', () => { const b = document.getElementById('camBtn'); if (b && !b.disabled) b.click(); });
@@ -3762,5 +3805,5 @@ html body .moves b{color:var(--vt-red)}
 })();
 </script>
 
-<script src="motion/aux.js?v=13"></script>
+<script src="motion/aux.js?v=17"></script>
 <script>addEventListener("load",function(){var q=new URLSearchParams(location.search).get("lab");if(!q)return;var id=q+"-lab",gi=(typeof GAME_LIST!=="undefined"?GAME_LIST:[]).findIndex(function(g){return g.id===id;});if(gi>=0)setTimeout(function(){if(window.__arcadeHome)window.__arcadeHome.openGame(gi);},1700);});</script>
