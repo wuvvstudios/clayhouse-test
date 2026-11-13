@@ -540,12 +540,13 @@ function make(look, o){
       const pos = [], idx = [], R = 3;
       for (let r = 0; r <= R; r++){ const t = r / R, e = 1 - Math.pow(1 - t, 2);
         for (let k = 0; k <= SEG; k++){ const E = edge[k % SEG], a = k / SEG * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a);
-          const d0 = E.d * 1.06 + 0.003, y0 = E.y - 0.012, nr = Math.hypot(NX * c, NZ * sn), y1 = Math.min(Math.max((E.ty || E.y) + 0.006, NP.y + 0.012), fem ? NP.y - 0.004 : NP.y + 0.02), d1 = Math.min(Math.max(nr, (E.td || 0) * 1.06 + 0.002), nr * 1.18);
+          const d0 = E.d * 1.06 + 0.003, y0 = E.y - 0.012, nr = Math.hypot(NX * c, NZ * sn), y1 = fem ? Math.min(Math.max((E.ty || E.y) + 0.006, NP.y + 0.012), NP.y - 0.004) : Math.max((E.ty || E.y) + 0.006, NP.y + 0.012), d1 = fem ? Math.min(Math.max(nr, (E.td || 0) * 1.06 + 0.002), nr * 1.18) : Math.max(nr, (E.td || 0) * 1.06 + 0.002);
           const dd = d0 + (d1 - d0) * e, dxr = dd * c, dzr = dd * sn;
           pos.push(NP.x + dxr, y0 + (y1 - y0) * t, NP.z + 0.004 * e + dzr); } }
       for (let r = 0; r < R; r++) for (let k = 0; k < SEG; k++){ const a = r * (SEG + 1) + k, b = a + SEG + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
       const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); cg.setIndex(idx); cg.computeVertexNormals();
-      const cr = new THREE.Mesh(cg, fig.mats.tee.clone()); cr.name = 'crewCollar'; cr.material.side = THREE.DoubleSide; cr.material.name = 'tee'; ch.add(cr);
+      const cm = new THREE.MeshStandardMaterial({ color: lin(L.tee), roughness: 0.8, side: THREE.DoubleSide }); cm.name = 'collar';
+      const cr = new THREE.Mesh(cg, cm); cr.name = 'crewCollar'; ch.add(cr); fig.collarMat = cm;
       // under the collar nothing should poke out: drop the chest's bare-skin patch and the shirt's cut-edge bits inside it
       { const ymin = Math.min(...edge.map(E => E.y)) - 0.012, si = ch.material.findIndex(m => m && m.name === 'skin'), ci = ch.material.findIndex(m => m && m.name === 'tee_cap'), out = [], ng = [];
         const edgeD = a => { const k = ((Math.round(a / (Math.PI * 2) * SEG) % SEG) + SEG) % SEG; return edge[k].d; };
@@ -596,6 +597,8 @@ function make(look, o){
         // lower row: same arch a touch narrower, sitting under the upper row and dropping with the jaw
         const t2 = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.94, R * 0.94, h * 0.85, 24, 1, false, Math.PI - th * 0.45 + Math.PI, th * 0.9), tm); t2.name = 'teethLow';
         t2.position.set(t.position.x, t.position.y - h * 0.92, t.position.z - 0.0015); head.add(t2); fig.teethLow = t2; fig.teethLowY = t2.position.y;
+        const tg = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), new THREE.MeshStandardMaterial({ color: lin('#c8606a'), roughness: 0.5 })); tg.name = 'tongue';
+        tg.scale.set(w * 0.4, h * 0.75, R * 0.6); tg.position.set(t.position.x, t.position.y - h * 1.6, b.max.z - 0.018); head.add(tg); fig.tongue = tg; fig.tongueRest = tg.position.clone(); fig.tongueH = h;
         fig.mouthHole = { g, pa, I, q }; } } }
   // a short-hair layer under every hairstyle: some styles were cut for the other head shape and left the back of the head
   // bare. A thin copy of the scalp, in the hair color, sits just above the skin (it follows the face-shape sliders too)
@@ -629,6 +632,9 @@ function make(look, o){
     const iv = open > 0.02 || sm > 0.3;
     for (const n of ['mouth', 'head_skin']){ const o = P[n]; if (!o) continue; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (!m) return; if (m.name === 'teeth') m.visible = false; if (m.name === 'mouthIn') m.visible = iv; }); }
     if (fig.teethRow) fig.teethRow.visible = iv;
+    const tout = W.x_tongue || 0;
+    if (fig.tongue){ fig.tongue.visible = iv || tout > 0.15; const R0 = fig.tongueRest, hh = fig.tongueH; fig.tongue.position.set(R0.x, R0.y - open * (fig.jawDrop || 0) * 0.75 - tout * hh * 0.2, R0.z + tout * 0.03); fig.tongue.rotation.x = tout * 0.5; }
+    if (tout > 0.15) for (const n of ['mouth', 'head_skin']){ const o = P[n]; if (o) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m && m.name === 'mouthIn') m.visible = true; }); }
     if (fig.teethLow){ fig.teethLow.visible = iv; fig.teethLow.position.y = fig.teethLowY - open * (fig.jawDrop || 0) * 0.8; } };
   fig.setExpr = kind => { if (fig.expr === kind) return; fig.expr = kind; const E = EXPR[kind] || EXPR.calm, W = Object.assign({}, W0, E); fig.morph.apply(W); mouthVis(W); };
   fig.setFace = W => { fig.expr = 'live'; fig.morph.apply(W); mouthVis(W); };   // live face (the face mirror): weights straight from the camera

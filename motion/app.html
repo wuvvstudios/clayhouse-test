@@ -142,7 +142,7 @@ header .vt{ font-size:26px; flex:1 }
 <div id="toast" class="glass"></div>
 <script src="lib/three.min.js"></script>
 <script src="lib/clayfigure_data.js"></script>
-<script src="lib/clayfigure.js?v=7"></script>
+<script src="lib/clayfigure.js?v=9"></script>
 <script src="lib/clayavatar.js?v=3"></script>
 <script src="lib/qrcode.js"></script>
 <script src="figpass.js?v=1"></script>
@@ -318,6 +318,18 @@ $('#scanGo').addEventListener('click', async () => {
 });
 
 // ---------- face mirror ----------
+// tongue: the face tracker does not report a stuck-out tongue, so it is read from the picture: below the lower lip turns
+// pink-red compared with the cheeks. A tiny copy of the frame is read on the phone and thrown away right after.
+const tcv = document.createElement('canvas'); tcv.width = 160; tcv.height = 120; const tcx = tcv.getContext('2d', { willReadFrequently: true }); let tSm = 0, tN = 0;
+function tongue(res, bs){
+  const lm = res.faceLandmarks && res.faceLandmarks[0]; if (!lm || !video) return 0;
+  if ((tN++ & 1) === 0){ try { tcx.drawImage(video, 0, 0, 160, 120); } catch (_) { return tSm; }
+    const red = (x, y) => { const d = tcx.getImageData(Math.max(0, Math.min(156, Math.round(x * 160) - 2)), Math.max(0, Math.min(116, Math.round(y * 120) - 2)), 4, 4).data; let r = 0, g = 0, b = 0; for (let i = 0; i < d.length; i += 4){ r += d[i]; g += d[i + 1]; b += d[i + 2]; } return r / (g + b + 1); };
+    const below = red((lm[14].x + lm[17].x) / 2, lm[14].y + (lm[17].y - lm[14].y) * 0.55), cheek = (red(lm[50].x, lm[50].y) + red(lm[280].x, lm[280].y)) / 2;
+    const v = Math.max(bs.tongueOut || 0, Math.min(1, Math.max(0, (below - cheek - 0.1) / 0.18)) * ((bs.jawOpen || 0) > 0.05 ? 1 : 0.4));
+    tSm += (v - tSm) * 0.35; }
+  return tSm > 0.12 ? tSm : 0;
+}
 // the mirror starts as soon as you open it, and stops when you leave
 async function startMirror(){
   $('#mirrorMsg').textContent = 'Starting camera…';
@@ -334,7 +346,7 @@ async function startMirror(){
     MX.W = Object.assign({}, W0, { x_blinkL: bs.eyeBlinkRight, x_blinkR: bs.eyeBlinkLeft, x_wideL: bs.eyeWideRight, x_wideR: bs.eyeWideLeft, x_squintL: bs.eyeSquintRight, x_squintR: bs.eyeSquintLeft,
       x_browInnerUp: bs.browInnerUp, x_browOuterUpL: bs.browOuterUpRight, x_browOuterUpR: bs.browOuterUpLeft, x_browDownL: bs.browDownRight, x_browDownR: bs.browDownLeft,
       x_jawOpen: bs.jawOpen, x_smileL: bs.mouthSmileRight, x_smileR: bs.mouthSmileLeft, x_frownL: bs.mouthFrownRight, x_frownR: bs.mouthFrownLeft, x_pucker: bs.mouthPucker,
-      x_cheekPuff: bs.cheekPuff, x_mouthPX: (bs.mouthRight || 0) - (bs.mouthLeft || 0), x_lookPX: Math.max(0, (bs.eyeLookOutRight || 0) - 0.1), x_lookNX: Math.max(0, (bs.eyeLookOutLeft || 0) - 0.1),
+      x_cheekPuff: bs.cheekPuff, x_tongue: tongue(res, bs), x_mouthPX: (bs.mouthRight || 0) - (bs.mouthLeft || 0), x_lookPX: Math.max(0, (bs.eyeLookOutRight || 0) - 0.1), x_lookNX: Math.max(0, (bs.eyeLookOutLeft || 0) - 0.1),
       x_lookUp: bs.eyeLookUpLeft, x_lookDown: bs.eyeLookDownLeft });
     const m = res.facialTransformationMatrixes && res.facialTransformationMatrixes[0] && res.facialTransformationMatrixes[0].data;
     if (m){ MX.yaw = Math.max(-0.7, Math.min(0.7, -Math.atan2(m[8], m[10]))); MX.pitch = Math.max(-0.5, Math.min(0.5, Math.asin(Math.max(-1, Math.min(1, -m[9]))))); MX.roll = Math.max(-0.4, Math.min(0.4, -Math.atan2(m[1], m[5]))); }
