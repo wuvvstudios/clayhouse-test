@@ -27,10 +27,14 @@
   #clayAux.ax-V .ax-card{ width:212px } #clayAux.ax-Q .ax-card{ width:auto }
   #clayAux.ax-QV .ax-card{ width:212px } #clayAux.ax-QV .ax-idle{ flex-direction:column; text-align:center }
   /* each screen keeps the bottom-left corner clear for the aux */
-  html.ax-on #tv{ padding-bottom:240px !important }
+  html.ax-on #tv{ padding-bottom:var(--axh,240px) !important; transition:padding .3s ease }
+  html.ax-on #lobby{ grid-template-columns:1fr minmax(300px,420px) !important; align-items:start !important } html.ax-on #lobby > #pair{ grid-column:2 !important; grid-row:1 / span 4 } html.ax-on #lobby > :not(#pair){ grid-column:1 !important }
   html.ax-on .pausebtn{ left:auto !important; right:12px !important }
   html.ax-on #status{ text-align:right }
-  #clayAux .ax-idle{ display:flex; align-items:center; gap:10px; width:auto }
+  #clayAux .ax-sq{ width:212px; height:212px; flex:none; background:#fff; border:3px solid #1B1B1B; border-radius:14px; box-shadow:5px 5px 0 #1B1B1B; padding:14px } #clayAux .ax-sq svg{ width:100%; height:100%; display:block } #clayAux .ax-sq[hidden]{ display:none }
+  #clayAux.ax-S{ width:136px } #clayAux.ax-S .ax-sq{ width:136px; height:136px; padding:9px; border-radius:12px } #clayAux.ax-S .ax-card{ width:136px; padding:7px 9px; border-radius:12px }
+  #clayAux.ax-S .ax-now b{ font-size:13px } #clayAux.ax-S .ax-s{ font-size:11px } #clayAux.ax-S .ax-bar{ display:none }
+  #clayAux .ax-sq,#clayAux .ax-card{ transition:width .3s ease,height .3s ease,padding .3s ease }
   #clayAux.ax-Qs .ax-idle .ax-txt{ display:none }
   #clayAux .ax-qr{ width:96px; height:96px; flex:none; background:#fff; border:2px solid #1B1B1B; border-radius:8px; padding:5px }
   #clayAux .ax-qr svg{ width:100%; height:100% }
@@ -49,7 +53,7 @@
     if (document.getElementById('clayAux')) return;
     const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
     const box = document.createElement('div'); box.id = 'clayAux'; box.className = 'ax-H'; box.setAttribute('aria-live', 'polite');
-    box.innerHTML = `<div class="ax-player" id="axPlayer" hidden><div id="axYT"></div></div><div class="ax-card" id="axCard"></div>`;
+    box.innerHTML = `<div class="ax-sq" id="axSq"></div><div class="ax-player" id="axPlayer" hidden><div id="axYT"></div></div><div class="ax-card" id="axCard"></div>`;
     document.body.appendChild(box);
     document.documentElement.classList.add('ax-on'); render(); place();
   }
@@ -60,8 +64,10 @@
   function place(){
     const box = document.getElementById('clayAux'); if (!box) return;
     const vh = document.getElementById('vh'), home = !!(vh && !vh.hidden && getComputedStyle(vh).display !== 'none' && getComputedStyle(vh).visibility !== 'hidden');
-    const playing = !!S.q[0], cls = playing ? (home ? 'ax-V' : 'ax-H') : (home ? 'ax-QV' : 'ax-Q');
+    const big = !!S.q[0] || Date.now() - (S.seen || 0) < 60000;   // small until a phone joins or music starts
+    const cls = big ? 'ax-V' : 'ax-V ax-S';
     if (box.className !== cls) box.className = cls;
+    document.documentElement.style.setProperty('--axh', (box.offsetHeight + 28) + 'px');
     document.documentElement.classList.toggle('ax-home', home);
   }
   setInterval(place, 500);
@@ -70,11 +76,12 @@
     const card = document.getElementById('axCard'); if (!card) return;
     const cur = S.q[0];
     setTimeout(place, 0);
-    document.getElementById('axPlayer').hidden = !cur;
+    document.getElementById('axPlayer').hidden = !cur; const sq = document.getElementById('axSq'); sq.hidden = !!cur;
     if (!cur){
       let qr = '';
       try { const q = qrcode(0, 'M'); q.addData(url()); q.make(); qr = q.createSvgTag({ cellSize: 3, margin: 0, scalable: true }); } catch (_) {}
-      card.innerHTML = `<div class="ax-idle"><div class="ax-qr">${qr}</div><div class="ax-txt"><div class="ax-t">Take the aux</div><div class="ax-s">Scan to play your music on the TV</div><div class="ax-code">${esc(S.code || '----')}</div></div></div>`;
+      sq.innerHTML = qr;
+      card.innerHTML = `<div class="ax-now"><div class="ax-s">Nothing playing</div><b>Take the aux</b><div class="ax-bar"><i></i></div><div class="ax-s">Scan to play your music on the TV · aux ${esc(S.code || '----')}</div></div>`;
     } else {
       card.innerHTML = `<div class="ax-now"><div class="ax-s">${S.paused ? 'Paused' : 'Now playing'}${cur.by ? ' · ' + esc(cur.by) + ' has the aux' : ''}</div><b>${esc(cur.t)}</b>`
         + `<div class="ax-bar"><i id="axBar"></i></div><div class="ax-s">${S.q.length > 1 ? 'Up next: ' + esc(S.q[1].t) : 'Queue more from your phone'} · aux ${esc(S.code)}</div>`
@@ -131,7 +138,9 @@
 
   // ---------- phones ----------
   function onMsg(m){
+    if (m && m.t === 'ax-hi'){ const was = Date.now() - (S.seen || 0) < 60000; S.seen = Date.now(); if (!was) place(); return; }
     if (!m || m.t !== 'ax-act' || !m.p) return;
+    S.seen = Date.now();
     const id = +m.id || 0;
     if (id <= (S.ack[m.p] || 0)){ beat(); return; }
     S.ack[m.p] = id;

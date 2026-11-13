@@ -90,7 +90,8 @@ $('code').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); }
 if ($('code').value.length === 4 && name) connect();
 
 function act(o){ actId++; try { sessionStorage.setItem('axAct', actId); } catch (_) {} outbox = Object.assign({ t: 'ax-act', p: pid, id: actId, by: name }, o); link && link.send(outbox); }
-setInterval(() => { if (outbox && link) link.send(outbox); if (link && performance.now() - lastSt > 4000) $('link').textContent = 'Connecting'; }, 800);
+let hiN = 0;
+setInterval(() => { if (link && hiN++ % 4 === 0) link.send({ t: 'ax-hi', p: pid, by: name }); if (outbox && link) link.send(outbox); if (link && performance.now() - lastSt > 4000) $('link').textContent = 'Connecting'; }, 800);
 
 function onMsg(m){
   if (!m || m.t !== 'ax-st') return;
