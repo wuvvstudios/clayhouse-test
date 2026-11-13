@@ -2574,6 +2574,7 @@ const checkin=(function(){
   }
   function cleanName(raw){const n=String(raw||'').replace(/[^A-Za-z0-9 ]/g,'').replace(/\s+/g,' ').trim().slice(0,12).trim(); return n&&badName(n)?'':n;}
   function parsePass(text){
+    if(window.FigPass){ const f=FigPass.decode(text); if(f) return {code:'FIG-'+f.key,name:f.name,figure:f.look}; }   // the phone app's action-figure pass
     const p=String(text||'').split('|'); if(p.length<2||p.length>3||p[0].trim()!==PREFIX) return null;
     const code=p[1].trim().toUpperCase(); if(!parseCode(code)) return null;
     return {code,name:cleanName(p[2])};
@@ -2713,7 +2714,7 @@ const checkin=(function(){
     if(!opt.force&&text===lastText&&now-lastT<2500) return 'cool'; // same phone still held up
     lastText=text; lastT=now;
     const p=parsePass(text);
-    if(!p){ if(opt.force||now-badT>3000){badT=now; note('That code is not a Clayhouse pass. Open Character Studio and tap Check-in pass.');} return 'bad'; }
+    if(!p){ if(opt.force||now-badT>3000){badT=now; note('That code is not a Clayhouse pass. Open the Clayhouse app on your phone and tap Check-in pass.');} return 'bad'; }
     const n=nPlayers;
     const have=crew.findIndex((c,i)=>i<n&&c&&c.code===p.code&&c.name===p.name);
     if(have>=0){
@@ -2723,7 +2724,7 @@ const checkin=(function(){
     let i=crew.slice(0,n).findIndex(c=>!c);
     if(i<0) i=crew.slice(0,n).findIndex(c=>c&&c.stale);
     if(i<0){note('Everyone is checked in. Clear a spot to swap someone, or press Start.'); return 'full';}
-    crew[i]={code:p.code,name:p.name,stale:false}; { const h=loadHand(p.name); if(h) hands[i]=h; }
+    crew[i]={code:p.code,name:p.name,stale:false,figure:p.figure||null}; { const h=loadHand(p.name); if(h) hands[i]=h; }
     { let big=-1,bT=0; lastBodies.forEach((lm,k)=>{const T=Math.abs((lm[23].y+lm[24].y)-(lm[11].y+lm[12].y)); if(T>bT){bT=T; big=k;}}); if(big>=0&&lastCols&&lastCols[big]) pid.bind(i,lastCols[big]); }
     renderSlot(i); walkout(i,'checked in');
     note(crew.slice(0,n).every(c=>c&&!c.stale)?'Everyone is in. Step back and press Start.':`Welcome ${p.name||'P'+(i+1)}. Step back so the next player can walk up.`);
@@ -4348,62 +4349,43 @@ window.ClayCreator = (function () {
   return { open, close, isOpen: () => !!(ov && ov.classList.contains('on')) };
 })();
 
-/* Make your player on your phone: the TV shows a QR, the phone (motion/create.html#CODE) builds the figure and sends it,
-   and the TV saves it as Player 1. The TV creator stays as a backup ("Edit on the TV"). */
+/* Make your player in the Clayhouse phone app: the TV only shows the QR to get the app. Players build their figure
+   there and check in at the start of a game by holding the app's pass up to the camera. "Edit on the TV" stays as a backup. */
 window.ClayPhoneMake = (function () {
-  let ov = null, link = null, code = '', got = 0, onGot = null;
-  const BASE = 'https://wuvvstudios.github.io/clayhouse-test/motion/';
-  const url = () => (location.protocol === 'https:' ? new URL('motion/create.html', location.href).href : BASE + 'create.html') + '#' + code;
-  function css(){ const st = document.createElement('style'); st.textContent = `
+  let ov = null, onGot = null;
+  const url = () => location.protocol === 'https:' ? new URL('motion/app.html', location.href).href : 'https://wuvvstudios.github.io/clayhouse-test/motion/app.html';
+  function build(){
+    const stage = document.querySelector('#vh .stage'); if (!stage) return false;
+    const st = document.createElement('style'); st.textContent = `
 #vhPhoneMake{position:absolute;inset:0;z-index:590;display:none;align-items:center;justify-content:center;background:rgba(10,14,40,.55)}
 #vhPhoneMake.on{display:flex}
-#vhPhoneMake .pm{width:1040px;border-radius:40px;padding:48px 56px;display:grid;grid-template-columns:360px 1fr;gap:48px;align-items:center}
+#vhPhoneMake .pm{width:1080px;border-radius:40px;padding:48px 56px;display:grid;grid-template-columns:360px 1fr;gap:48px;align-items:center}
 #vhPhoneMake .pm-qr{width:360px;height:360px;background:#fff;border:4px solid #1B1B1B;border-radius:24px;padding:22px}
 #vhPhoneMake .pm-qr svg{width:100%;height:100%}
-#vhPhoneMake h2{margin:0 0 12px;font-family:'Bungee',sans-serif;font-weight:400;font-size:46px;line-height:1.05}
-#vhPhoneMake p{margin:0 0 18px;font-size:24px;line-height:1.35}
-#vhPhoneMake .pm-code{font-family:'Bungee',sans-serif;font-size:56px;letter-spacing:.14em;margin:6px 0 22px}
-#vhPhoneMake .pm-row{display:flex;gap:16px;flex-wrap:wrap}
-#vhPhoneMake .pm-row button{height:86px;padding:0 34px;border-radius:26px;font-family:'Bungee',sans-serif;font-size:22px}
-#vhPhoneMake .pm-st{font-size:20px;opacity:.8;margin-top:14px}`; document.head.appendChild(st); }
-  function build(){
-    const stage = document.querySelector('#vh .stage'); if (!stage) return false; css();
-    ov = document.createElement('section'); ov.id = 'vhPhoneMake'; ov.setAttribute('aria-label', 'Make your player on your phone');
-    ov.innerHTML = `<div class="pm glass"><div class="pm-qr" id="pmQR"></div><div><h2>Make your player on your phone</h2>
-      <p>Scan with your phone camera. Build your figure there, tap Send to TV, and it shows up here.</p><div class="pm-code" id="pmCode">----</div>
-      <div class="pm-row"><button class="btn-red" type="button" data-hand id="pmClose">Done</button><button class="glass" type="button" data-hand id="pmTV">Edit on the TV</button></div>
-      <div class="pm-st" id="pmSt">Waiting for a phone</div></div></div>`;
+#vhPhoneMake h2{margin:0 0 14px;font-family:'Bungee',sans-serif;font-weight:400;font-size:44px;line-height:1.05}
+#vhPhoneMake p{margin:0 0 14px;font-size:24px;line-height:1.35}
+#vhPhoneMake .pm-row{display:flex;gap:16px;flex-wrap:wrap;margin-top:18px}
+#vhPhoneMake .pm-row button{height:86px;padding:0 34px;border-radius:26px;font-family:'Bungee',sans-serif;font-size:22px}`; document.head.appendChild(st);
+    ov = document.createElement('section'); ov.id = 'vhPhoneMake'; ov.setAttribute('aria-label', 'Get the Clayhouse app');
+    ov.innerHTML = `<div class="pm glass"><div class="pm-qr" id="pmQR"></div><div><h2>Your player lives on your phone</h2>
+      <p>Scan to open the Clayhouse app. Make your player, scan your face, and see your wins.</p>
+      <p>When a game starts, tap <b>Check-in pass</b> in the app and hold your phone up to the TV camera.</p>
+      <div class="pm-row"><button class="btn-red" type="button" data-hand id="pmClose">Got it</button><button class="glass" type="button" data-hand id="pmTV">Edit on the TV</button></div></div></div>`;
     stage.appendChild(ov);
     ov.addEventListener('click', e => { if (e.target === ov || e.target.closest('#pmClose')) close(); if (e.target.closest('#pmTV')){ close(); if (window.ClayCreator) ClayCreator.open(onGot); } });
     return true;
   }
-  function host(){
-    if (link || !window.ClayLink) return;
-    code = ClayLink.newCode();
-    link = ClayLink.host(code, (m) => {
-      if (!m || m.t !== 'fig-set' || !m.look || typeof m.look !== 'object') return;
-      const id = +m.id || 0; link.send({ t: 'fig-ok', id });
-      if (id <= got) return; got = id;
-      try { localStorage.setItem('clayhouse.figure', JSON.stringify(m.look)); } catch (_) {}
-      const st = document.getElementById('pmSt'); if (st) st.textContent = 'Got it! Your player is updated.';
-      if (onGot) try { onGot(m.look); } catch (_) {}
-      setTimeout(close, 1400);
-    }, s => { const st = document.getElementById('pmSt'); if (st && got === 0) st.textContent = s === 'direct' || s === 'relay' ? 'Waiting for a phone' : 'Connecting'; });
-  }
   function open(cb){
-    if (!ov && !build()) return;
-    onGot = cb || null;
-    const go = (n) => {
-      if (!window.ClayLink || !window.qrcode){ if (n < 40) setTimeout(() => go(n + 1), 250); else document.getElementById('pmSt').textContent = 'The phone link did not load. Use Edit on the TV.'; return; }
-      host(); document.getElementById('pmCode').textContent = code;
-      try { const q = qrcode(0, 'M'); q.addData(url()); q.make(); document.getElementById('pmQR').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch (_) {}
-    };
-    ov.classList.add('on'); go(0);
+    if (!ov && !build()) return; onGot = cb || null; ov.classList.add('on');
+    const go = n => { if (!window.qrcode){ if (n < 40) setTimeout(() => go(n + 1), 250); return; }
+      try { const q = qrcode(0, 'M'); q.addData(url()); q.make(); document.getElementById('pmQR').innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch (_) {} };
+    go(0);
   }
   function close(){ if (ov) ov.classList.remove('on'); }
   return { open, close };
 })();
 </script>
 
+<script src="motion/figpass.js?v=1"></script>
 <script src="motion/aux.js?v=17"></script>
 <script>addEventListener("load",function(){var q=new URLSearchParams(location.search).get("lab");if(!q)return;var id=q+"-lab",gi=(typeof GAME_LIST!=="undefined"?GAME_LIST:[]).findIndex(function(g){return g.id===id;});if(gi>=0)setTimeout(function(){if(window.__arcadeHome)window.__arcadeHome.openGame(gi);},1700);});</script>

@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Clayhouse</title>
+<meta name="theme-color" content="#2B5A97">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Oswald:wght@400;500;600;700&display=swap">
+<style>
+:root{ --ink:#1B1B1B; --cream:#F3E6C8; --gold:#F6C343; --red:#D8402B; --blue:#2B5A97; --navy:rgba(20,22,48,.42) }
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent }
+html,body{ margin:0; height:100%; background:var(--blue); color:var(--cream); font-family:'Oswald','Arial Narrow',sans-serif; overscroll-behavior:none }
+body{ height:100dvh; overflow:hidden; background:repeating-conic-gradient(from 0deg at 50% 26%,rgba(255,240,200,0.06) 0deg 7deg,rgba(0,0,0,0) 7deg 14deg),var(--blue) }
+button{ font:inherit; color:inherit; cursor:pointer }
+[hidden]{ display:none!important }
+.glass{ background:var(--cream); border:3px solid var(--ink); box-shadow:4px 4px 0 var(--ink); color:var(--ink) }
+.glass:active,.red:active{ transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink) }
+.red{ background:var(--red); color:var(--cream); border:3px solid var(--ink); box-shadow:4px 4px 0 var(--ink) }
+.vt{ font-family:'Bungee',sans-serif; font-weight:400; color:var(--gold); -webkit-text-stroke:1.2px var(--ink); text-shadow:2px 2px 0 #B5541E,4px 4px 0 var(--ink); margin:0 }
+.screen{ position:absolute; inset:0; display:flex; flex-direction:column }
+header{ display:flex; align-items:center; gap:10px; padding:max(12px,env(safe-area-inset-top)) 16px 6px }
+header .vt{ font-size:26px; flex:1 }
+.back{ height:44px; padding:0 14px; border-radius:999px; font-family:'Bungee',sans-serif; font-size:14px }
+/* the figure stage, shared by every screen */
+#stage{ position:absolute; left:0; right:0; top:0; height:46dvh; pointer-events:none; z-index:1 }
+#stage canvas{ width:100%; height:100%; display:block }
+#stage.full{ height:100dvh }
+.under{ height:46dvh; flex:none; position:relative; touch-action:none; z-index:2 }
+.turn{ position:absolute; bottom:8px; display:flex; gap:10px; left:50%; transform:translateX(-50%) }
+.turn button{ height:40px; padding:0 14px; border-radius:999px; font-family:'Bungee',sans-serif; font-size:14px }
+.scroll{ flex:1; overflow:auto; padding:6px 16px max(18px,env(safe-area-inset-bottom)); position:relative; z-index:2 }
+/* home */
+#home .under{ height:40dvh }
+.name{ display:flex; gap:10px; align-items:center; margin:4px 0 12px }
+.name input{ flex:1; height:52px; border-radius:16px; padding:0 14px; font:600 20px 'Oswald',sans-serif; border:3px solid var(--ink); background:var(--cream); color:var(--ink); box-shadow:4px 4px 0 var(--ink) }
+.menu{ display:grid; grid-template-columns:1fr 1fr; gap:12px }
+.menu button{ min-height:86px; border-radius:22px; font-family:'Bungee',sans-serif; font-size:16px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:4px; padding:12px 14px; text-align:left }
+.menu button small{ font-family:'Oswald',sans-serif; font-weight:500; font-size:13px; opacity:.75; text-transform:none }
+.menu .wide{ grid-column:1 / -1 }
+.h{ font-family:'Bungee',sans-serif; font-size:15px; color:var(--gold); text-shadow:1px 1px 0 var(--ink); margin:16px 0 8px }
+.wins{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px }
+.win{ border-radius:16px; padding:10px; text-align:center; background:var(--navy); border:2px solid var(--ink) }
+.win b{ display:block; font-family:'Bungee',sans-serif; font-size:26px; color:var(--gold) }
+.win span{ font-size:13px }
+.note{ font-size:14px; opacity:.8; line-height:1.35 }
+/* creator */
+#tabs{ display:flex; gap:8px; overflow-x:auto; padding:8px 16px 10px; scrollbar-width:none; position:relative; z-index:2 }
+#tabs::-webkit-scrollbar{ display:none }
+.tab{ flex:none; height:44px; padding:0 16px; border-radius:999px; font-family:'Bungee',sans-serif; font-size:14px }
+.tab.on{ background:var(--red); color:var(--cream) }
+.grid{ display:flex; flex-wrap:wrap; gap:10px }
+.opt{ min-width:88px; height:56px; padding:0 14px; border-radius:16px; font-family:'Bungee',sans-serif; font-size:13px }
+.opt.on{ outline:4px solid var(--gold); outline-offset:2px }
+.sw{ width:56px; min-width:0; padding:0; border-radius:50% }
+.sl{ display:grid; grid-template-columns:110px 52px 1fr 52px; gap:8px; align-items:center; margin-bottom:8px; font-size:15px; font-weight:600 }
+.sl button{ height:48px; border-radius:14px; font-family:'Bungee',sans-serif; font-size:22px }
+.bar{ height:10px; border-radius:999px; background:rgba(243,230,200,.25); position:relative; border:2px solid var(--ink) }
+.bar i{ position:absolute; top:-7px; width:20px; height:20px; border-radius:50%; background:var(--gold); border:2px solid var(--ink); transform:translateX(-50%) }
+.lock{ border:2px dashed rgba(243,230,200,.6); border-radius:16px; padding:12px 14px; font-size:15px; line-height:1.35 }
+.lock b{ font-family:'Bungee',sans-serif; font-weight:400; color:var(--gold) }
+.foot{ display:flex; gap:10px; padding:10px 16px max(14px,env(safe-area-inset-bottom)); background:var(--navy); border-top:3px solid var(--ink); position:relative; z-index:2 }
+.foot button{ height:58px; border-radius:18px; font-family:'Bungee',sans-serif; font-size:17px; padding:0 16px }
+.foot .grow{ flex:1 }
+/* scan */
+#scanView{ position:relative; flex:1; margin:6px 16px; border-radius:26px; overflow:hidden; border:3px solid var(--ink); background:#000 }
+#scanView video{ width:100%; height:100%; object-fit:cover; transform:scaleX(-1) }
+#scanView .oval{ position:absolute; left:50%; top:46%; width:62%; aspect-ratio:3/4; transform:translate(-50%,-50%); border:4px dashed rgba(246,195,67,.95); border-radius:50% }
+#scanMsg{ position:absolute; left:12px; right:12px; bottom:12px; text-align:center; font-family:'Bungee',sans-serif; font-size:18px; padding:12px; border-radius:16px; background:rgba(20,22,48,.75) }
+.consent{ margin:6px 16px; padding:14px; border-radius:18px; background:var(--navy); border:2px solid var(--ink); font-size:15px; line-height:1.4 }
+/* mirror */
+#mirror .under{ height:62dvh }
+#mirrorCam{ position:absolute; right:12px; top:12px; width:96px; height:128px; border-radius:14px; overflow:hidden; border:3px solid var(--ink); background:#000; z-index:3 }
+#mirrorCam video{ width:100%; height:100%; object-fit:cover; transform:scaleX(-1) }
+/* pass */
+#pass{ background:#F3E6C8; color:var(--ink) }
+#pass .vt{ font-size:24px }
+.passBox{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:10px 16px }
+#passQR{ width:min(78vw,46dvh); aspect-ratio:1; background:#fff; border:4px solid var(--ink); border-radius:18px; padding:14px }
+#passQR svg{ width:100%; height:100% }
+#passName{ font-family:'Bungee',sans-serif; font-size:28px }
+#passFig{ width:110px; height:150px }
+#toast{ position:fixed; left:16px; right:16px; top:38%; text-align:center; font-family:'Bungee',sans-serif; font-size:19px; padding:16px; border-radius:20px; opacity:0; pointer-events:none; transition:opacity .25s; z-index:9 }
+#toast.on{ opacity:1 }
+#load{ position:absolute; left:0; right:0; top:18dvh; text-align:center; font-family:'Bungee',sans-serif; font-size:16px; z-index:3 }
+</style></head>
+<body>
+<div id="stage"><canvas></canvas></div>
+<div id="load">Getting your figure ready…</div>
+
+<!-- HOME: your profile and the menu -->
+<section class="screen" id="home">
+  <header><h1 class="vt">Clayhouse</h1></header>
+  <div class="under" data-spin></div>
+  <div class="scroll">
+    <div class="name"><input id="nick" maxlength="12" placeholder="Your name" autocomplete="off" aria-label="Your name"></div>
+    <div class="menu">
+      <button class="red wide" data-go="pass">Check-in pass<small>Hold it up to the TV camera when it's your turn</small></button>
+      <button class="glass" data-go="make">Edit my player<small>Look, hair, outfit</small></button>
+      <button class="glass" data-go="scan">Face scan<small>Build your face from your camera</small></button>
+      <button class="glass" data-go="mirror">Face mirror<small>Your player copies your face</small></button>
+      <button class="glass" data-go="moments">Moments<small>Your best shots from the TV</small></button>
+    </div>
+    <div class="h">Wins</div>
+    <div class="wins" id="wins"></div>
+    <p class="note" id="winsNote"></p>
+  </div>
+</section>
+
+<!-- MAKE: the creator -->
+<section class="screen" id="make" hidden>
+  <header><button class="glass back" data-go="home">◀ Back</button><h1 class="vt" style="font-size:22px">Edit my player</h1></header>
+  <div class="under" data-spin><div class="turn"><button class="glass" data-turn="-1">◀ Turn</button><button class="glass" data-turn="1">Turn ▶</button></div></div>
+  <nav id="tabs"></nav>
+  <main class="scroll" id="panel"></main>
+  <div class="foot"><button class="glass" id="rand">Surprise me</button><button class="red grow" data-go="home" id="doneMake">Done</button></div>
+</section>
+
+<!-- SCAN -->
+<section class="screen" id="scan" hidden>
+  <header><button class="glass back" data-go="home" id="scanBack">◀ Back</button><h1 class="vt" style="font-size:22px">Face scan</h1></header>
+  <div class="consent" id="consent">Your camera reads the shape of your face and your skin and hair color, right here on your phone. No picture is saved or sent anywhere.</div>
+  <div id="scanView" hidden><video playsinline muted></video><div class="oval"></div><div id="scanMsg">Starting camera…</div></div>
+  <div class="foot"><button class="red grow" id="scanGo">Start face scan</button></div>
+</section>
+
+<!-- MIRROR -->
+<section class="screen" id="mirror" hidden>
+  <header><button class="glass back" data-go="home">◀ Back</button><h1 class="vt" style="font-size:22px">Face mirror</h1></header>
+  <div class="under"><div id="mirrorCam" hidden><video playsinline muted></video></div></div>
+  <div class="scroll"><p class="note" id="mirrorMsg">Smile, raise your brows, open your mouth, blink, turn your head. Your player does it too. Nothing is recorded.</p></div>
+</section>
+
+<!-- MOMENTS -->
+<section class="screen" id="moments" hidden>
+  <header><button class="glass back" data-go="home">◀ Back</button><h1 class="vt" style="font-size:22px">Moments</h1></header>
+  <div class="scroll"><div class="lock" style="margin-top:46dvh"><b>Coming soon</b><br>Your celebration pictures from the TV (knockouts, strikes, big wins) land here so you can post them.</div></div>
+</section>
+
+<!-- PASS -->
+<section class="screen" id="pass" hidden>
+  <header><button class="glass back" data-go="home">◀ Back</button><h1 class="vt">Check-in pass</h1></header>
+  <div class="passBox"><div id="passQR"></div><div id="passName"></div><p class="note" style="text-align:center;margin:0">Turn your brightness up. When the TV says check in, walk up and hold this to its camera.</p></div>
+</section>
+
+<div id="toast" class="glass"></div>
+<script src="lib/three.min.js"></script>
+<script src="lib/clayfigure_data.js"></script>
+<script src="lib/clayfigure.js"></script>
+<script src="lib/clayavatar.js"></script>
+<script src="lib/qrcode.js"></script>
+<script src="figpass.js?v=1"></script>
+<script>
+// Clayhouse phone app: your profile (your player, name and wins), the creator, face scan, face mirror, Moments and the
+// check-in pass. Everything stays on this phone (localStorage); the camera picture is never saved or sent.
+(function(){
+const $ = s => document.querySelector(s), MINE = 'clayhouse.myfigure', NAME = 'clayhouse.myname', WINS = 'clayhouse.wins', KEY = 'clayhouse.figure';
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const store = { get(k, d){ try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } }, set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} } };
+const TABS = [['body', 'Body'], ['skin', 'Skin'], ['face', 'Face'], ['eyes', 'Eyes'], ['brows', 'Brows & lips'], ['hair', 'Hair'], ['facial', 'Facial hair'], ['extras', 'Extras'], ['outfit', 'Outfit']];
+const HEADTABS = { face: 1, eyes: 1, brows: 1, hair: 1, facial: 1, extras: 1 };
+const P = window.FigPass;
+const rgb = a => `rgb(${a.map(v => v <= 1 ? Math.round(Math.pow(v, 1 / 2.2) * 255) : v).join(',')})`;
+let screen = 'home', tab = 'body', look = null, av = null, yaw = 0, view = { y: 0.95, d: 5.2 }, r, sc, cam, last = 0, faceLM = null, video = null, stream = null, mirrorOn = false;
+
+function toast(t, ms){ const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), ms || 1800); }
+const D = () => ClayFigure.data;
+
+// ---------- screens ----------
+function go(s){
+  if (screen === 'scan' || screen === 'mirror') stopCam();
+  screen = s; document.querySelectorAll('.screen').forEach(el => el.hidden = el.id !== s);
+  $('#stage').style.display = s === 'scan' || s === 'pass' ? 'none' : '';
+  if (s === 'home') renderHome(); if (s === 'make') panel(); if (s === 'pass') renderPass();
+  if (s === 'mirror'){ $('#mirrorCam').hidden = true; startMirror(); }
+  if (s === 'scan'){ $('#scanView').hidden = true; $('#consent').hidden = false; $('#scanGo').disabled = false; $('#scanGo').textContent = 'Start face scan'; }
+}
+function renderHome(){
+  $('#nick').value = store.get(NAME, '');
+  const w = store.get(WINS, {}), games = Object.keys(w).filter(k => w[k] > 0).sort((a, b) => w[b] - w[a]);
+  const total = games.reduce((a, k) => a + w[k], 0);
+  $('#wins').innerHTML = `<div class="win"><b>${total}</b><span>All games</span></div>` + games.slice(0, 5).map(k => `<div class="win"><b>${w[k]}</b><span>${esc(k)}</span></div>`).join('');
+  $('#winsNote').textContent = total ? '' : 'Your wins show up here after you play on a Clayhouse TV.';
+}
+$('#nick').addEventListener('input', e => { const v = P.cleanName(e.target.value); store.set(NAME, v); });
+
+// ---------- creator ----------
+const opt = (k, v, label, on, style) => `<button class="glass opt${style ? ' sw' : ''}${on ? ' on' : ''}" data-k="${k}" data-v="${v}"${style ? ` style="${style}" aria-label="${esc(label)}"` : ''}>${style ? '' : esc(label)}</button>`;
+const slider = (key, label) => { const v = look.shape[key] || 0; return `<div class="sl"><span>${esc(label)}</span><button class="glass" data-k="s:${key}" data-v="-1" aria-label="Less ${esc(label)}">−</button><div class="bar"><i style="left:${(v + 1) * 50}%"></i></div><button class="glass" data-k="s:${key}" data-v="1" aria-label="More ${esc(label)}">+</button></div>`; };
+function panel(){
+  $('#tabs').querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  const d = D(), L = look; let h = '';
+  if (tab === 'body') h = `<div class="h">Body type</div><div class="grid">${opt('base', 'male', 'Body type 1', L.base === 'male')}${opt('base', 'female', 'Body type 2', L.base === 'female')}</div>`;
+  if (tab === 'skin') h = `<div class="h">Skin tone</div><div class="grid">${d.tones.map((t, i) => opt('tone', i, t.name, L.tone === i, `background:${rgb(t.rgb)}`)).join('')}</div>`;
+  if (tab === 'face') h = `<div class="h">Start from</div><div class="grid">${d.presets.map((p, i) => opt('preset', i, p.label, false)).join('')}</div><div class="h">Shape</div>${P.SHAPES.map(k => slider(k, (d.shapes.find(s => s.key === k) || {}).label || k)).join('')}`;
+  if (tab === 'eyes') h = `<div class="h">Eye color</div><div class="grid">${d.eyeColors.map((c, i) => opt('eye', i, c.name, L.eye === i, `background:${rgb(c.rgb)}`)).join('')}</div>
+    <div class="h">Lashes</div><div class="grid">${opt('liner', 0, 'None', L.liner === 0)}${opt('liner', 1, 'Soft', L.liner === 1)}${opt('liner', 2, 'Bold', L.liner === 2)}</div>`;
+  if (tab === 'brows') h = `<div class="h">Brows</div><div class="grid">${[0, 1, 2, 3, 4].map(i => opt('brow', i, 'Style ' + (i + 1), L.brow === i)).join('')}</div>
+    <div class="h">Brow color</div><div class="grid">${opt('browC', -1, 'Match hair', L.browC === -1)}${d.hairColors.map((c, i) => opt('browC', i, c.name, L.browC === i, `background:${rgb(c.rgb)}`)).join('')}</div>
+    <div class="h">Lip color</div><div class="grid">${opt('lip', -1, 'Natural', L.lip === -1)}${d.lipTints.map((c, i) => opt('lip', i, c.name, L.lip === i, `background:${rgb(c.rgb)}`)).join('')}</div>`;
+  if (tab === 'hair') h = `<div class="h">Style</div><div class="grid">${d.hairs.map(x => opt('hair', x.key, x.label, L.hair === x.key)).join('')}</div>
+    <div class="h">Color</div><div class="grid">${d.hairColors.map((c, i) => opt('hairC', i, c.name, L.hairC === i, `background:${rgb(c.rgb)}`)).join('')}</div>`;
+  if (tab === 'facial') h = `<div class="h">Facial hair</div><div class="grid">${P.FACIAL.map(k => opt('facial', k, k === 'none' ? 'None' : k[0].toUpperCase() + k.slice(1), L.facial === k)).join('')}</div>`;
+  if (tab === 'extras') h = `<div class="h">Glasses</div><div class="grid">${P.GLASSES.map(k => opt('glasses', k, { none: 'None', round: 'Round', rect: 'Square', cat: 'Cat eye' }[k], L.glasses === k)).join('')}</div>
+    <div class="h">Earrings</div><div class="grid">${P.EARS.map(k => opt('ears', k, { none: 'None', studs: 'Studs', hoops: 'Hoops' }[k], L.ears === k)).join('')}</div>`;
+  if (tab === 'outfit') h = `<div class="h">Shirt</div><div class="lock"><b>Wuvv shirts</b><br>Shirts will be Wuvv pieces only. They land here once the shirt artwork is in.</div>
+    <div class="h">Pants</div><div class="grid">${P.PANTS.map(c => opt('pants', c, c, L.pants === c, `background:${c}`)).join('')}</div>
+    <div class="h">Shoe accents</div><div class="grid">${P.SHOES.map(c => opt('accent', c, c, L.accent === c, `background:${c}`)).join('')}</div>`;
+  $('#panel').innerHTML = h;
+}
+function surprise(){
+  const d = D(), pick = a => a[(Math.random() * a.length) | 0];
+  Object.assign(look, { base: Math.random() < 0.5 ? 'male' : 'female', tone: (Math.random() * d.tones.length) | 0, eye: (Math.random() * d.eyeColors.length) | 0,
+    hair: pick(d.hairs).key, hairC: (Math.random() * 6) | 0, brow: (Math.random() * 5) | 0, browC: -1, glasses: pick(['none', 'none', 'none', 'round', 'rect', 'cat']),
+    ears: pick(['none', 'none', 'studs', 'hoops']), shape: Object.assign({}, pick(d.presets).v || {}), pants: pick(P.PANTS), accent: pick(P.SHOES) });
+  look.facial = look.base === 'male' ? pick(['none', 'none', 'stubble', 'goatee', 'beard', 'mustache']) : 'none';
+  look.liner = look.base === 'female' ? 1 + ((Math.random() * 2) | 0) : (Math.random() < 0.5 ? 0 : 1);
+  save(); panel(); remake();
+}
+function save(){ store.set(MINE, look); }
+
+// ---------- the figure ----------
+function remake(){
+  if (av){ try { av.dispose(); } catch (_) {} av = null; }
+  let prev = null; try { prev = localStorage.getItem(KEY); localStorage.setItem(KEY, JSON.stringify(look)); } catch (_) {}
+  try { av = ClayAvatar.make(ClayAvatar.specs({ players: 1 }, 1)[0], { height: 1.8, shirt: look.tee }); av.root.rotation.y = yaw; sc.add(av.root); } catch (e) { console.warn(e); }
+  try { if (prev == null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, prev); } catch (_) {}
+}
+const MX = { pitch: 0, yaw: 0, roll: 0, W: null };
+function loop(now){
+  requestAnimationFrame(loop); const dt = Math.min(0.05, (now - last) / 1000 || 0), t = now / 1000; last = now;
+  const cv = $('#stage canvas'), w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
+  if (cv.width !== w * 2 || cv.height !== h * 2){ r.setSize(w * 2, h * 2, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+  if (!av) return;
+  av.root.rotation.y += ((mirrorOn ? 0 : yaw) - av.root.rotation.y) * (1 - Math.exp(-dt * 8));
+  if (av.update) av.update(dt, t);
+  if (av.play && av.hasAnim && av.hasAnim('Idle_Loop')){ av.play('Idle_Loop', {}); av.animate(dt); }
+  const fig = av.rig && av.rig.fig;
+  if (mirrorOn && fig){
+    if (MX.W && fig.morph) fig.morph.apply(MX.W);
+    if (av.head){ av.head.rotation.x += (MX.pitch - av.head.rotation.x) * 0.5; av.head.rotation.y += (MX.yaw - av.head.rotation.y) * 0.5; av.head.rotation.z += (MX.roll - av.head.rotation.z) * 0.5; }
+  }
+  const close = (screen === 'make' && HEADTABS[tab]) || screen === 'mirror' ? 1 : 0, k = 1 - Math.exp(-dt * 5);
+  view.y += ((screen === 'mirror' ? 1.6 : close ? 1.55 : 0.95) - view.y) * k; view.d += ((screen === 'mirror' ? 1.25 : close ? 1.8 : 5.4) - view.d) * k;
+  cam.position.set(0, view.y + 0.02, view.d); cam.lookAt(0, view.y, 0);
+  r.render(sc, cam);
+}
+
+// ---------- camera + face tracking (on this phone only) ----------
+async function startCam(el){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw Object.assign(new Error('nocam'), { name: 'NotAllowedError' });
+  stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+  video = el; video.srcObject = stream; await video.play();
+  if (!faceLM){
+    // MediaPipe is served from this site (lib/mediapipe), so the scan does not hang on an outside server
+    const base = new URL('lib/mediapipe/', location.href).href;
+    const vision = await import(base + 'vision_bundle.mjs');
+    const files = await vision.FilesetResolver.forVisionTasks(base + 'wasm');
+    const models = ['https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task', base + 'face_landmarker.task'];
+    const o = (d, m) => ({ baseOptions: { modelAssetPath: m, delegate: d }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true });
+    let err = null;
+    for (const m of models) for (const d of ['GPU', 'CPU']){ if (faceLM) break; try { faceLM = await vision.FaceLandmarker.createFromOptions(files, o(d, m)); } catch (e) { err = e; } }
+    if (!faceLM) throw err || new Error('facelm');
+  }
+}
+function stopCam(){ if (mirrorOn && av && av.rig && av.rig.fig && av.rig.fig.setExpr){ av.rig.fig.expr = null; av.rig.fig.setExpr('calm'); } MX.W = null; mirrorOn = false; if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; } if (video){ video.srcObject = null; } }
+let lastVT = -1;
+function detect(){ if (!faceLM || !video || video.readyState < 2 || video.currentTime === lastVT) return null; lastVT = video.currentTime; try { return faceLM.detectForVideo(video, performance.now()); } catch (_) { return null; } }
+const camErr = e => e && e.name === 'NotAllowedError' ? 'Camera is blocked. Allow the camera for this site in your browser settings, then try again.' : e && e.name === 'NotFoundError' ? 'No camera found on this phone.' : 'Face tracking could not load. Check your connection and try again.';
+
+// ---------- face scan ----------
+const grab = document.createElement('canvas'), gx = grab.getContext('2d', { willReadFrequently: true });
+function patch(img, W, H, x, y, rr){ let R = 0, G = 0, B = 0, n = 0; const cx = Math.round(x * W), cy = Math.round(y * H);
+  for (let j = -rr; j <= rr; j += 2) for (let i = -rr; i <= rr; i += 2){ const px = cx + i, py = cy + j; if (px < 0 || py < 0 || px >= W || py >= H) continue; const k = (py * W + px) * 4; R += img[k]; G += img[k + 1]; B += img[k + 2]; n++; }
+  return n ? [R / n, G / n, B / n] : null; }
+const avg = list => { const ok = list.filter(Boolean); return ok.length ? [0, 1, 2].map(i => ok.reduce((a, c) => a + c[i], 0) / ok.length) : null; };
+function readFace(lm, img, W, H){
+  const d = (a, b) => Math.hypot((lm[a].x - lm[b].x) * W, (lm[a].y - lm[b].y) * H);
+  const fw = d(234, 454), fh = d(10, 152), rr = Math.max(3, Math.round(fw * 0.04));
+  const skin = avg([patch(img, W, H, lm[50].x, lm[50].y, rr), patch(img, W, H, lm[280].x, lm[280].y, rr), patch(img, W, H, lm[151].x, lm[151].y, rr)]);
+  const topY = lm[10].y - 0.16 * fh / H, dx = 0.14 * fw / W;
+  const hair = avg([patch(img, W, H, lm[10].x, topY, rr), patch(img, W, H, lm[10].x - dx, topY + 0.02, rr), patch(img, W, H, lm[10].x + dx, topY + 0.02, rr)]);
+  const tilt = Math.atan2((lm[33].y - lm[133].y) * H + (lm[362].y - lm[263].y) * H, (lm[133].x - lm[33].x) * W + (lm[263].x - lm[362].x) * W);
+  return { skin, hair, r: { width: fw / fh, jaw: d(172, 397) / fw, chin: d(17, 152) / fh, cheek: d(116, 345) / fw, nose: d(168, 2) / fh, nosew: d(48, 278) / fw,
+    lips: d(0, 17) / fh, lipW: d(61, 291) / fw, eye: (d(159, 145) + d(386, 374)) / 2 / fw, esp: d(133, 362) / fw, eyeTilt: -tilt } };
+}
+// typical ratios for a face looking straight at the camera; the sliders move from these
+const NORM = { width: [0.86, 0.07], jaw: [0.8, 0.06], chin: [0.21, 0.035], cheek: [0.9, 0.05], nose: [0.25, 0.035], nosew: [0.26, 0.03], lips: [0.115, 0.025], lipW: [0.38, 0.04], eye: [0.045, 0.012], esp: [0.24, 0.025], eyeTilt: [0.04, 0.06] };
+const lum = c => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+function finishScan(frames){
+  frames = frames.filter(f => f && f.skin); if (frames.length < 5) return null;
+  const d = D(), skin = avg(frames.map(f => f.skin)), hair = avg(frames.map(f => f.hair));
+  const sL = lum(skin) * 1.12, sW = (skin[0] - skin[2]) / (skin[0] + 1);
+  look.tone = d.tones.map((t, i) => ({ i, e: Math.abs(lum(t.rgb) - sL) + 40 * Math.abs((t.rgb[0] - t.rgb[2]) / (t.rgb[0] + 1) - sW) })).sort((a, b) => a.e - b.e)[0].i;
+  if (hair){ const h = hair.map(v => Math.min(255, v * 1.15)), hc = d.hairColors.map(c => c.rgb.map(v => Math.pow(v, 1 / 2.2) * 255));
+    look.hairC = hc.map((c, i) => ({ i, e: Math.hypot(c[0] - h[0], c[1] - h[1], c[2] - h[2]) + (i >= 6 ? 60 : 0) })).sort((a, b) => a.e - b.e)[0].i; }
+  const S = Object.assign({}, look.shape);
+  for (const k in NORM){ const v = frames.reduce((a, f) => a + f.r[k], 0) / frames.length, [m, s] = NORM[k]; S[k] = Math.round(Math.max(-0.8, Math.min(0.8, (v - m) / s * 0.4)) * 4) / 4; }
+  S.long = -S.width / 2; S.round = 0;
+  look.shape = S; return true;
+}
+$('#scanGo').addEventListener('click', async () => {
+  const msg = $('#scanMsg'), b = $('#scanGo'); b.disabled = true;
+  $('#consent').hidden = true; $('#scanView').hidden = false; msg.textContent = 'Starting camera…';
+  try { await startCam($('#scanView video')); } catch (e) { msg.textContent = camErr(e); b.disabled = false; b.textContent = 'Try again'; return; }
+  const frames = [], W = () => video.videoWidth, H = () => video.videoHeight;
+  // wait for a face in the oval
+  msg.textContent = 'Put your face in the oval';
+  const t0 = performance.now(); let seen = 0;
+  while (performance.now() - t0 < 15000 && screen === 'scan'){ await new Promise(r => requestAnimationFrame(r)); const res = detect(); if (res && res.faceLandmarks && res.faceLandmarks[0]){ if (++seen > 8) break; } }
+  if (screen !== 'scan') return;
+  if (seen <= 8){ msg.textContent = 'Could not find your face. More light, phone at eye level, try again.'; stopCam(); b.disabled = false; b.textContent = 'Try again'; return; }
+  for (const n of ['3', '2', '1']){ msg.textContent = 'Hold still… ' + n; await new Promise(r => setTimeout(r, 650)); }
+  msg.textContent = 'Reading your face…';
+  const t1 = performance.now();
+  while (frames.length < 16 && performance.now() - t1 < 5000){ await new Promise(r => requestAnimationFrame(r)); const res = detect(); const lm = res && res.faceLandmarks && res.faceLandmarks[0];
+    if (lm){ grab.width = W(); grab.height = H(); gx.drawImage(video, 0, 0); frames.push(readFace(lm, gx.getImageData(0, 0, grab.width, grab.height).data, grab.width, grab.height)); } }
+  stopCam();
+  if (!finishScan(frames)){ msg.textContent = 'That scan did not come through. Try again with more light.'; b.disabled = false; b.textContent = 'Try again'; return; }
+  save(); remake(); tab = 'face'; go('make'); toast("Here's you! Tweak anything you want.", 2400);
+});
+
+// ---------- face mirror ----------
+// the mirror starts as soon as you open it, and stops when you leave
+async function startMirror(){
+  $('#mirrorMsg').textContent = 'Starting camera…';
+  try { $('#mirrorCam').hidden = false; await startCam($('#mirrorCam video')); } catch (e) { $('#mirrorMsg').textContent = camErr(e); $('#mirrorCam').hidden = true; return; }
+  if (screen !== 'mirror'){ stopCam(); return; }
+  mirrorOn = true; $('#mirrorMsg').textContent = 'Smile, raise your brows, open your mouth, blink, turn your head. Nothing is recorded.';
+  const W0 = {}; for (const k in look.shape) W0['s_' + k] = look.shape[k];
+  (function track(){
+    if (!mirrorOn) return; requestAnimationFrame(track);
+    const res = detect(); if (!res) return;
+    const c = res.faceBlendshapes && res.faceBlendshapes[0] && res.faceBlendshapes[0].categories; if (!c) return;
+    const bs = {}; c.forEach(x => bs[x.categoryName] = x.score);
+    // the screen is a mirror: your left eye drives the figure's eye on the same side of the screen
+    MX.W = Object.assign({}, W0, { x_blinkL: bs.eyeBlinkRight, x_blinkR: bs.eyeBlinkLeft, x_wideL: bs.eyeWideRight, x_wideR: bs.eyeWideLeft, x_squintL: bs.eyeSquintRight, x_squintR: bs.eyeSquintLeft,
+      x_browInnerUp: bs.browInnerUp, x_browOuterUpL: bs.browOuterUpRight, x_browOuterUpR: bs.browOuterUpLeft, x_browDownL: bs.browDownRight, x_browDownR: bs.browDownLeft,
+      x_jawOpen: bs.jawOpen, x_smileL: bs.mouthSmileRight, x_smileR: bs.mouthSmileLeft, x_frownL: bs.mouthFrownRight, x_frownR: bs.mouthFrownLeft, x_pucker: bs.mouthPucker,
+      x_cheekPuff: bs.cheekPuff, x_mouthPX: (bs.mouthRight || 0) - (bs.mouthLeft || 0), x_lookPX: Math.max(0, (bs.eyeLookOutRight || 0) - 0.1), x_lookNX: Math.max(0, (bs.eyeLookOutLeft || 0) - 0.1),
+      x_lookUp: bs.eyeLookUpLeft, x_lookDown: bs.eyeLookDownLeft });
+    const m = res.facialTransformationMatrixes && res.facialTransformationMatrixes[0] && res.facialTransformationMatrixes[0].data;
+    if (m){ MX.yaw = Math.max(-0.7, Math.min(0.7, -Math.atan2(m[8], m[10]))); MX.pitch = Math.max(-0.5, Math.min(0.5, Math.asin(Math.max(-1, Math.min(1, -m[9]))))); MX.roll = Math.max(-0.4, Math.min(0.4, -Math.atan2(m[1], m[5]))); }
+  })();
+}
+
+// ---------- check-in pass ----------
+function renderPass(){
+  const name = store.get(NAME, ''), text = P.encode(look, name);
+  try { const q = qrcode(0, 'M'); q.addData(text); q.make(); $('#passQR').innerHTML = q.createSvgTag({ cellSize: 6, margin: 2, scalable: true }); } catch (e) { $('#passQR').textContent = 'Could not make the pass.'; }
+  $('#passName').textContent = name || 'Player';
+}
+
+// ---------- start ----------
+function start(){
+  if (!window.THREE || !window.ClayFigure || !window.ClayAvatar){ $('#load').textContent = 'Could not load your figure. Check your connection and refresh.'; return; }
+  look = Object.assign({}, ClayFigure.DEF, store.get(MINE, null) || {}); look.shape = Object.assign({}, look.shape || {});
+  r = new THREE.WebGLRenderer({ canvas: $('#stage canvas'), alpha: true, antialias: true }); r.setPixelRatio(1);
+  sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.1)); const dl = new THREE.DirectionalLight(0xffffff, 0.6); dl.position.set(1, 2, 3); sc.add(dl);
+  cam = new THREE.PerspectiveCamera(24, 1, 0.05, 50);
+  $('#tabs').innerHTML = TABS.map(([k, l]) => `<button class="glass tab" data-tab="${k}">${l}</button>`).join('');
+  document.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.go){ go(b.dataset.go); return; }
+    if (b.dataset.tab){ tab = b.dataset.tab; panel(); return; }
+    if (b.dataset.turn){ yaw += +b.dataset.turn * 0.6; return; }
+    if (b.id === 'rand') return surprise();
+    if (b.dataset.k){ const k = b.dataset.k; let v = b.dataset.v; v = /^-?\d+$/.test(v) ? +v : v;
+      if (k === 'preset') look.shape = Object.assign({}, (D().presets[v] || {}).v || {});
+      else if (k.startsWith('s:')){ const s = k.slice(2); look.shape = Object.assign({}, look.shape); look.shape[s] = Math.max(-1, Math.min(1, Math.round(((look.shape[s] || 0) + v * 0.25) * 4) / 4)); }
+      else look[k] = v;
+      save(); panel(); remake(); }
+  });
+  document.querySelectorAll('[data-spin]').forEach(el => { let dx = null;
+    el.addEventListener('pointerdown', e => { if (e.target.closest('button')) return; dx = e.clientX; el.setPointerCapture(e.pointerId); });
+    el.addEventListener('pointermove', e => { if (dx != null){ yaw += (e.clientX - dx) * 0.012; dx = e.clientX; } });
+    el.addEventListener('pointerup', () => { dx = null; }); });
+  go('home');
+  (ClayFigure.ready || Promise.resolve()).then(() => { remake(); $('#load').remove(); requestAnimationFrame(loop); });
+}
+start();
+})();
+</script>
+</body></html>
