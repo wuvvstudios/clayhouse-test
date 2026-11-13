@@ -512,7 +512,31 @@ function make(look, o){
   const knob = new THREE.Mesh(new THREE.SphereGeometry(0.031, 16, 10), pinMat); knob.position.set(px, top + 0.055, pz); knob.scale.set(1, 0.85, 1); toy.add(knob);
   const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.04, 0.012, 18), pinMat); collar.position.set(px, top + 0.004, pz); toy.add(collar);
   toy.visible = false; fig.toyPeg = toy;
-  if (sock){ const cap = new THREE.Mesh(new THREE.CircleGeometry(sock.r * 0.98, 24), new THREE.MeshStandardMaterial({ color: 0x2a1d18, roughness: 0.7, side: THREE.DoubleSide }));
+  // the inside of the shirt reads as body, not an empty shell: the tee draws its outside only, and a skin-toned copy draws
+  // its inside, so looking in at the collar, sleeves or hem you see the figure, never the back of the fabric
+  { const inner = new THREE.MeshStandardMaterial({ color: tc.clone().multiplyScalar(0.62), roughness: 0.7, side: THREE.BackSide });
+    if (fig.mats.tee) fig.mats.tee.side = THREE.FrontSide;
+    for (const k in fig.seg){ const o = fig.seg[k]; if (!o || !o.isMesh || !Array.isArray(o.material) || !o.material.some(m => m && (m.name === 'tee' || m.name === 'tee_cap'))) continue;
+      // its own geometry with just the shirt triangles (one plain material, so every renderer keeps it as it is)
+      const g = o.geometry, ti = o.material.findIndex(m => m && m.name === 'tee'), q = g.groups.find(x => x.materialIndex === ti); if (!q || !g.index) continue;
+      const bg = new THREE.BufferGeometry(); for (const nm in g.attributes) bg.setAttribute(nm, g.attributes[nm]);
+      bg.setIndex(Array.from(g.index.array.slice(q.start, q.start + q.count)));
+      const back = new THREE.Mesh(bg, inner); back.name = 'teeInside'; o.add(back); } }
+  // a clean neckline: the sculpted collar edge is ragged (shirt shards and gaps at the neck), so the tee is trimmed in a
+  // smooth oval around the neck and a skin-colored fill closes the opening, so you never look into an empty shirt
+  { const ch = fig.seg.chest; if (ch && ch.geometry && ch.geometry.index && Array.isArray(ch.material)){
+      const g = ch.geometry, pa = g.attributes.position, I = g.index.array, mi = n => ch.material.findIndex(m => m && m.name === n);
+      const RX = 0.088, RZ = 0.078, cut = NP.y - 0.055, inNeck = (x, z) => ((x - NP.x) / RX) ** 2 + ((z - NP.z) / RZ) ** 2 < 1;
+      const drop = new Set(['tee', 'tee_cap'].map(mi).filter(k => k >= 0)), out = [], ng = [];
+      g.groups.slice().sort((a, b) => a.start - b.start).forEach(q => { const st = out.length;
+        for (let t = q.start; t < q.start + q.count; t += 3){ const a = I[t], b = I[t + 1], c = I[t + 2];
+          if (drop.has(q.materialIndex)){ const x = (pa.getX(a) + pa.getX(b) + pa.getX(c)) / 3, y = (pa.getY(a) + pa.getY(b) + pa.getY(c)) / 3, z = (pa.getZ(a) + pa.getZ(b) + pa.getZ(c)) / 3;
+            if (y > cut && inNeck(x, z)) continue; }
+          out.push(a, b, c); }
+        ng.push([st, out.length - st, q.materialIndex]); });
+      g.setIndex(out); g.clearGroups(); ng.forEach(q => g.addGroup(q[0], q[1], q[2]));
+       } }
+  if (sock){ const cap = new THREE.Mesh(new THREE.CircleGeometry(sock.r * 0.98, 24), new THREE.MeshStandardMaterial({ color: tc.clone().multiplyScalar(0.7), roughness: 0.7, side: THREE.DoubleSide }));
     cap.rotation.x = Math.PI / 2; cap.position.set(sock.x, sock.y + 0.003, sock.z); head.add(cap);
     const ring = new THREE.Mesh(new THREE.RingGeometry(sock.r * 0.45, sock.r * 0.62, 20), pinMat); ring.rotation.x = Math.PI / 2; ring.position.set(sock.x, sock.y + 0.0015, sock.z); head.add(ring); }
   // head: centre (for rolling) and size, in model units
