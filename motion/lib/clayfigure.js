@@ -597,6 +597,24 @@ function make(look, o){
         const t2 = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.94, R * 0.94, h * 0.85, 24, 1, false, Math.PI - th * 0.45 + Math.PI, th * 0.9), tm); t2.name = 'teethLow';
         t2.position.set(t.position.x, t.position.y - h * 0.92, t.position.z - 0.0015); head.add(t2); fig.teethLow = t2; fig.teethLowY = t2.position.y;
         fig.mouthHole = { g, pa, I, q }; } } }
+  // a short-hair layer under every hairstyle: some styles were cut for the other head shape and left the back of the head
+  // bare. A thin copy of the scalp, in the hair color, sits just above the skin (it follows the face-shape sliders too)
+  if (L.hair !== 'none' && P.head_skin && P.head_skin.geometry.index){
+    const src = P.head_skin.geometry, pa = src.attributes.position, nm = src.attributes.normal, I = src.index.array;
+    src.computeBoundingBox(); const bb = src.boundingBox, H = bb.max.y - bb.min.y, Dp = bb.max.z - bb.min.z;
+    const ss2 = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+    const keep = v => { const u = (pa.getY(v) - bb.min.y) / H, w = (pa.getZ(v) - bb.min.z) / Dp, side = Math.abs(pa.getX(v)) / ((bb.max.x - bb.min.x) / 2);
+      return u > 0.5 + 0.3 * ss2(0.35, 0.85, w) + 0.06 * ss2(0.6, 1, side) * ss2(0.3, 0.6, w); };
+    const g = new THREE.BufferGeometry(), np = new Float32Array(pa.array.length);
+    for (let i = 0; i < pa.count; i++){ const o = 0.0018; np[i * 3] = pa.getX(i) + nm.getX(i) * o; np[i * 3 + 1] = pa.getY(i) + nm.getY(i) * o; np[i * 3 + 2] = pa.getZ(i) + nm.getZ(i) * o; }
+    g.setAttribute('position', new THREE.BufferAttribute(np, 3)); g.setAttribute('normal', nm);
+    const k = src.groups.length ? src.groups.find(q => (Array.isArray(P.head_skin.material) ? P.head_skin.material[q.materialIndex] : P.head_skin.material).name === 'skin') : null;
+    const st = k ? k.start : 0, en = k ? k.start + k.count : I.length, idx = [];
+    for (let t = st; t < en; t += 3) if (keep(I[t]) && keep(I[t + 1]) && keep(I[t + 2])) idx.push(I[t], I[t + 1], I[t + 2]);
+    g.setIndex(idx);
+    const hc0 = HAIRC[L.hairC].rgb, sm = new THREE.MeshStandardMaterial({ color: new THREE.Color(hc0[0] * 0.9, hc0[1] * 0.9, hc0[2] * 0.9), roughness: 0.75, map: POOL.hair1 || null, normalMap: POOL.hair1N || null }); sm.name = 'scalpHair';
+    const shell = new THREE.Mesh(g, sm); shell.name = 'scalpHair'; shell.userData.morphs = P.head_skin.userData.morphs; head.add(shell); P.scalpHair = shell;
+  }
   fig.morph = morphable(head);
   // how far the lower lip drops when the jaw opens fully, so the lower teeth can follow it
   if (fig.mouthHole){ const { pa, I, q } = fig.mouthHole, low = () => { let m = 9; for (let i = q.start; i < q.start + q.count; i++) m = Math.min(m, pa.getY(I[i])); return m; };
