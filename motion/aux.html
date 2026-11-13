@@ -50,7 +50,7 @@ form{ display:flex; gap:8px } form button{ flex-shrink:0 }
 <section id="main" hidden style="display:flex;flex-direction:column;gap:12px">
   <div class="panel" id="nowP">
     <div id="now"><img id="nowImg" alt=""><div class="w"><small id="nowBy">Nothing playing</small><b id="nowT">Search for a song below</b><div class="bar"><i id="bar"></i></div></div></div>
-    <div class="ctl"><button id="pp">Pause</button><button id="skip">Skip</button></div>
+    <div class="ctl"><button id="pp">Pause</button><button id="skip">Skip</button><button id="stop">Stop</button></div>
   </div>
   <div id="msg"></div>
   <form id="sf"><input id="q" placeholder="Search a song or artist" autocomplete="off" enterkeyhint="search" aria-label="Search"><button class="gold">Search</button></form>
@@ -114,6 +114,7 @@ function draw(){
 }
 $('pp').onclick = () => { if (S) act({ a: S.paused ? 'play' : 'pause' }); };
 $('skip').onclick = () => act({ a: 'skip' });
+$('stop').onclick = () => act({ a: 'stop' });
 $('queue').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.del) act({ a: 'del', i: +b.dataset.del }); if (b.dataset.up) act({ a: 'up', i: +b.dataset.up }); });
 
 $('sf').addEventListener('submit', async e => {

@@ -11,6 +11,8 @@
   const load = src => new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   let saved = {}; try { saved = JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch (_) {}
+  // the queue only carries over between pages for a short while: come back later (or open the TV fresh) and the aux starts empty
+  if (!saved.at || Date.now() - saved.at > 5 * 60 * 1000) saved.q = [];
   const S = { code: saved.code || '', q: Array.isArray(saved.q) ? saved.q : [], pos: +saved.pos || 0, paused: !!saved.paused, at: +saved.at || 0, ack: {}, msg: '' };
   let link = null, player = null, ready = false, loadedId = '', muteBlocked = false, lastBeat = 0;
 
@@ -127,6 +129,7 @@
     if (m.a === 'now' && song){ S.q.unshift(song); S.pos = 0; S.paused = false; S.msg = by + ' took the aux'; }
     else if (m.a === 'add' && song){ S.q.push(song); S.msg = by + ' queued ' + song.t; }
     else if (m.a === 'skip' && S.q.length){ S.q.shift(); S.pos = 0; S.paused = false; S.msg = by + ' skipped'; }
+    else if (m.a === 'stop'){ S.q = []; S.pos = 0; S.paused = false; S.msg = by + ' cleared the aux'; }
     else if (m.a === 'pause'){ S.paused = true; }
     else if (m.a === 'play'){ S.paused = false; }
     else if (m.a === 'del' && m.i > 0 && m.i < S.q.length){ S.q.splice(m.i, 1); }
