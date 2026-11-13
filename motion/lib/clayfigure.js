@@ -512,6 +512,52 @@ function make(look, o){
   const knob = new THREE.Mesh(new THREE.SphereGeometry(0.031, 16, 10), pinMat); knob.position.set(px, top + 0.055, pz); knob.scale.set(1, 0.85, 1); toy.add(knob);
   const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.04, 0.012, 18), pinMat); collar.position.set(px, top + 0.004, pz); toy.add(collar);
   toy.visible = false; fig.toyPeg = toy;
+  // a crew collar band around the base of the neck: it covers the neck joint's seam and the inside of the shirt, so a
+  // turning head never shows the gap or the shards under the collar
+  { const ch = fig.seg.chest; if (ch && ch.geometry && ch.geometry.index && Array.isArray(ch.material)){ const g = ch.geometry, pa = g.attributes.position, I = g.index.array;
+      const ti = ch.material.findIndex(m => m && m.name === 'tee'), q = g.groups.find(x => x.materialIndex === ti); let top = -9, sx = 0, sz = 0, n = 0, rx = 0, rz = 0;
+      if (q) for (let i = q.start; i < q.start + q.count; i++){ const v = I[i]; if (Math.hypot(pa.getX(v) - NP.x, pa.getZ(v) - NP.z) < 0.12) top = Math.max(top, pa.getY(v)); }
+      if (q) for (let i = q.start; i < q.start + q.count; i++){ const v = I[i]; if (pa.getY(v) > top - 0.012 && Math.hypot(pa.getX(v) - NP.x, pa.getZ(v) - NP.z) < 0.12){ sx += pa.getX(v); sz += pa.getZ(v); n++; } }
+      if (q) for (let i = q.start; i < q.start + q.count; i++){ const v = I[i]; if (pa.getY(v) > top - 0.012 && Math.hypot(pa.getX(v) - NP.x, pa.getZ(v) - NP.z) < 0.12){ rx = Math.max(rx, Math.abs(pa.getX(v) - sx / n)); rz = Math.max(rz, Math.abs(pa.getZ(v) - sz / n)); } }
+      if (!n) top = -9;
+      if (top > -9){
+      // the band hugs the neckline ring: a short tube, a bit narrower at the top like a ribbed collar
+      // a crew neck: from the neckline up to snug around the neck, covering the bare chest triangles and the joint seam
+      // the neckline edge, direction by direction around the neck: the innermost shirt point in each slice
+      const fem = base === 'female', NX = fem ? 0.043 : 0.06, NZ = fem ? 0.042 : 0.056, SEG = 48, edge = [];
+      for (let k = 0; k < SEG; k++) edge.push(null);
+      for (let i = q.start; i < q.start + q.count; i++){ const v = I[i], dx = pa.getX(v) - NP.x, dz = pa.getZ(v) - NP.z, d = Math.hypot(dx, dz); if (d > 0.16) continue;
+        const k = ((Math.round(Math.atan2(dz, dx) / (Math.PI * 2) * SEG) % SEG) + SEG) % SEG, e = edge[k];
+        if (!e || d < e.d) edge[k] = Object.assign(e || {}, { d, a: Math.atan2(dz, dx), y: pa.getY(v) }); const E2 = edge[k]; if (E2.ty == null || pa.getY(v) > E2.ty){ E2.ty = pa.getY(v); E2.td = d; } }
+      for (let k = 0; k < SEG; k++) if (!edge[k]){ const a = edge[(k + SEG - 1) % SEG] || edge[(k + 1) % SEG]; edge[k] = a ? Object.assign({}, a, { a: k / SEG * Math.PI * 2 }) : { d: 0.1, a: k / SEG * Math.PI * 2, y: NP.y }; }
+      // smooth the edge around the neck so the collar is one clean curve, not the sculpt's ragged steps
+      { const raw = edge.map(E => Object.assign({}, E)), W = 5;
+        for (let k = 0; k < SEG; k++){ let y = 0, d = 0, ty = -9, td = 0, ymin = 9, n = 0;
+          for (let j = -W; j <= W; j++){ const E = raw[(k + j + SEG) % SEG]; y += E.y; d += E.d; n++; ymin = Math.min(ymin, E.y); if ((E.ty || E.y) > ty){ ty = E.ty || E.y; } td = Math.max(td, E.td || E.d); }
+          edge[k] = { a: raw[k].a, y: Math.min(y / n, ymin + 0.006), d: d / n, ty, td }; }
+        for (let pass = 0; pass < 2; pass++){ const c = edge.map(E => Object.assign({}, E)); for (let k = 0; k < SEG; k++){ const A = c[(k + SEG - 1) % SEG], B = c[k], C = c[(k + 1) % SEG];
+          edge[k].ty = (A.ty + B.ty * 2 + C.ty) / 4; edge[k].td = (A.td + B.td * 2 + C.td) / 4; edge[k].y = (A.y + B.y * 2 + C.y) / 4; } } }
+      const pos = [], idx = [], R = 3;
+      for (let r = 0; r <= R; r++){ const t = r / R, e = 1 - Math.pow(1 - t, 2);
+        for (let k = 0; k <= SEG; k++){ const E = edge[k % SEG], a = k / SEG * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a);
+          const d0 = E.d * 1.06 + 0.003, y0 = E.y - 0.012, nr = Math.hypot(NX * c, NZ * sn), y1 = Math.min(Math.max((E.ty || E.y) + 0.006, NP.y + 0.012), fem ? NP.y - 0.004 : NP.y + 0.02), d1 = Math.min(Math.max(nr, (E.td || 0) * 1.06 + 0.002), nr * 1.18);
+          const dd = d0 + (d1 - d0) * e, dxr = dd * c, dzr = dd * sn;
+          pos.push(NP.x + dxr, y0 + (y1 - y0) * t, NP.z + 0.004 * e + dzr); } }
+      for (let r = 0; r < R; r++) for (let k = 0; k < SEG; k++){ const a = r * (SEG + 1) + k, b = a + SEG + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); cg.setIndex(idx); cg.computeVertexNormals();
+      const cr = new THREE.Mesh(cg, fig.mats.tee.clone()); cr.name = 'crewCollar'; cr.material.side = THREE.DoubleSide; cr.material.name = 'tee'; ch.add(cr);
+      // under the collar nothing should poke out: drop the chest's bare-skin patch and the shirt's cut-edge bits inside it
+      { const ymin = Math.min(...edge.map(E => E.y)) - 0.012, si = ch.material.findIndex(m => m && m.name === 'skin'), ci = ch.material.findIndex(m => m && m.name === 'tee_cap'), out = [], ng = [];
+        const edgeD = a => { const k = ((Math.round(a / (Math.PI * 2) * SEG) % SEG) + SEG) % SEG; return edge[k].d; };
+        g.groups.slice().sort((x, y) => x.start - y.start).forEach(gq => { const st = out.length;
+          for (let t = gq.start; t < gq.start + gq.count; t += 3){ const A = I[t], B = I[t + 1], C = I[t + 2];
+            if (gq.materialIndex === si || gq.materialIndex === ci){ const x = (pa.getX(A) + pa.getX(B) + pa.getX(C)) / 3 - NP.x, y = (pa.getY(A) + pa.getY(B) + pa.getY(C)) / 3, z = (pa.getZ(A) + pa.getZ(B) + pa.getZ(C)) / 3 - NP.z;
+              if (gq.materialIndex === si && y > ymin - 0.03) continue;
+              if (gq.materialIndex === ci && y > ymin && Math.hypot(x, z) < edgeD(Math.atan2(z, x)) * 1.12) continue; }
+            out.push(A, B, C); }
+          ng.push([st, out.length - st, gq.materialIndex]); });
+        g.setIndex(out); g.clearGroups(); ng.forEach(x => g.addGroup(x[0], x[1], x[2])); }
+ } } }
   // the inside of the shirt reads as body, not an empty shell: the tee draws its outside only, and a skin-toned copy draws
   // its inside, so looking in at the collar, sleeves or hem you see the figure, never the back of the fabric
   { const inner = new THREE.MeshStandardMaterial({ color: tc.clone().multiplyScalar(0.62), roughness: 0.7, side: THREE.BackSide });
@@ -522,20 +568,6 @@ function make(look, o){
       const bg = new THREE.BufferGeometry(); for (const nm in g.attributes) bg.setAttribute(nm, g.attributes[nm]);
       bg.setIndex(Array.from(g.index.array.slice(q.start, q.start + q.count)));
       const back = new THREE.Mesh(bg, inner); back.name = 'teeInside'; o.add(back); } }
-  // a clean neckline: the sculpted collar edge is ragged (shirt shards and gaps at the neck), so the tee is trimmed in a
-  // smooth oval around the neck and a skin-colored fill closes the opening, so you never look into an empty shirt
-  { const ch = fig.seg.chest; if (ch && ch.geometry && ch.geometry.index && Array.isArray(ch.material)){
-      const g = ch.geometry, pa = g.attributes.position, I = g.index.array, mi = n => ch.material.findIndex(m => m && m.name === n);
-      const RX = 0.088, RZ = 0.078, cut = NP.y - 0.055, inNeck = (x, z) => ((x - NP.x) / RX) ** 2 + ((z - NP.z) / RZ) ** 2 < 1;
-      const drop = new Set(['tee', 'tee_cap'].map(mi).filter(k => k >= 0)), out = [], ng = [];
-      g.groups.slice().sort((a, b) => a.start - b.start).forEach(q => { const st = out.length;
-        for (let t = q.start; t < q.start + q.count; t += 3){ const a = I[t], b = I[t + 1], c = I[t + 2];
-          if (drop.has(q.materialIndex)){ const x = (pa.getX(a) + pa.getX(b) + pa.getX(c)) / 3, y = (pa.getY(a) + pa.getY(b) + pa.getY(c)) / 3, z = (pa.getZ(a) + pa.getZ(b) + pa.getZ(c)) / 3;
-            if (y > cut && inNeck(x, z)) continue; }
-          out.push(a, b, c); }
-        ng.push([st, out.length - st, q.materialIndex]); });
-      g.setIndex(out); g.clearGroups(); ng.forEach(q => g.addGroup(q[0], q[1], q[2]));
-       } }
   if (sock){ const cap = new THREE.Mesh(new THREE.CircleGeometry(sock.r * 0.98, 24), new THREE.MeshStandardMaterial({ color: tc.clone().multiplyScalar(0.7), roughness: 0.7, side: THREE.DoubleSide }));
     cap.rotation.x = Math.PI / 2; cap.position.set(sock.x, sock.y + 0.003, sock.z); head.add(cap);
     const ring = new THREE.Mesh(new THREE.RingGeometry(sock.r * 0.45, sock.r * 0.62, 20), pinMat); ring.rotation.x = Math.PI / 2; ring.position.set(sock.x, sock.y + 0.0015, sock.z); head.add(ring); }
@@ -560,8 +592,15 @@ function make(look, o){
         const tt = new THREE.CanvasTexture(tc2); tt.encoding = THREE.sRGBEncoding;
         const tm = new THREE.MeshStandardMaterial({ map: tt, roughness: 0.35 }); tm.name = 'teethRow';
         const t = new THREE.Mesh(geo, tm); t.name = 'teethRow';
-        t.position.set((b.min.x + b.max.x) / 2, b.max.y - h / 2 + 0.0002, b.max.z - 0.011 - R); head.add(t); fig.teethRow = t; } } }
+        t.position.set((b.min.x + b.max.x) / 2, b.max.y - h / 2 + 0.0002, b.max.z - 0.011 - R); head.add(t); fig.teethRow = t;
+        // lower row: same arch a touch narrower, sitting under the upper row and dropping with the jaw
+        const t2 = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.94, R * 0.94, h * 0.85, 24, 1, false, Math.PI - th * 0.45 + Math.PI, th * 0.9), tm); t2.name = 'teethLow';
+        t2.position.set(t.position.x, t.position.y - h * 0.92, t.position.z - 0.0015); head.add(t2); fig.teethLow = t2; fig.teethLowY = t2.position.y;
+        fig.mouthHole = { g, pa, I, q }; } } }
   fig.morph = morphable(head);
+  // how far the lower lip drops when the jaw opens fully, so the lower teeth can follow it
+  if (fig.mouthHole){ const { pa, I, q } = fig.mouthHole, low = () => { let m = 9; for (let i = q.start; i < q.start + q.count; i++) m = Math.min(m, pa.getY(I[i])); return m; };
+    const y0 = low(); fig.morph.apply({ x_jawOpen: 1 }); fig.jawDrop = Math.max(0, y0 - low()); fig.morph.apply({}); }
   const W0 = {}; for (const s of SHAPES) W0['s_' + s.key] = L.shape[s.key] || 0;
   for (const [k, v] of Object.entries((EYESHAPES[L.eyeShape] || EYESHAPES[0]).v)) W0['s_' + k] = (W0['s_' + k] || 0) + v;
   for (const [k, v] of Object.entries((LIPSHAPES[L.lipShape] || LIPSHAPES[0]).v)) W0['s_' + k] = (W0['s_' + k] || 0) + v;
@@ -571,7 +610,8 @@ function make(look, o){
     // by name on the meshes themselves: the games swap the figure's materials, so the original ones would be the wrong objects
     const iv = open > 0.02 || sm > 0.3;
     for (const n of ['mouth', 'head_skin']){ const o = P[n]; if (!o) continue; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (!m) return; if (m.name === 'teeth') m.visible = false; if (m.name === 'mouthIn') m.visible = iv; }); }
-    if (fig.teethRow) fig.teethRow.visible = iv; };
+    if (fig.teethRow) fig.teethRow.visible = iv;
+    if (fig.teethLow){ fig.teethLow.visible = iv; fig.teethLow.position.y = fig.teethLowY - open * (fig.jawDrop || 0) * 0.8; } };
   fig.setExpr = kind => { if (fig.expr === kind) return; fig.expr = kind; const E = EXPR[kind] || EXPR.calm, W = Object.assign({}, W0, E); fig.morph.apply(W); mouthVis(W); };
   fig.setFace = W => { fig.expr = 'live'; fig.morph.apply(W); mouthVis(W); };   // live face (the face mirror): weights straight from the camera
   fig.setExpr('calm');
