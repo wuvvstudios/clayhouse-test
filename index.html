@@ -4000,7 +4000,7 @@ window.WuvvTee = (function () {
       <div aria-hidden="true" style="position:absolute;left:60px;bottom:66px;width:480px;height:80px;border-radius:50%;background:radial-gradient(closest-side,rgba(5,10,30,0.45),rgba(5,10,30,0))"></div>
       <button class="me" id="vhMe" type="button" data-hand aria-label="Your figure, tap to wave" style="position:absolute;left:90px;bottom:84px;width:427px;height:640px;border:0;padding:0;background:transparent;display:flex;align-items:flex-end;justify-content:center">
         <img id="vhMeImg" alt="" style="height:640px;width:427px;display:block">
-        <span class="hint" style="position:absolute;top:120px;right:-60px;border-radius:999px;padding:9px 14px;font-size:15px;font-weight:700;white-space:nowrap;background:#1B1B1B;border:2px solid #F3E6C8;color:#F3E6C8">Customizing comes next</span>
+        <span class="hint" style="position:absolute;top:120px;right:-60px;border-radius:999px;padding:9px 14px;font-size:15px;font-weight:700;white-space:nowrap;background:#1B1B1B;border:2px solid #F3E6C8;color:#F3E6C8">Tap to customize</span>
       </button>
     </section>
     <div style="position:absolute;left:50%;top:40px;transform:translateX(-50%);z-index:230;display:flex;align-items:center;gap:14px">
@@ -4087,7 +4087,7 @@ window.WuvvTee = (function () {
   q('#vhPrev').addEventListener('click', () => go(-1)); q('#vhNext').addEventListener('click', () => go(1));
   q('#vhBack').addEventListener('click', close); q('#vhPlay').addEventListener('click', play);
   let waveT = null;
-  q('#vhMe').addEventListener('click', () => { if (LIVE.on){ LIVE.wave = performance.now() / 1000; return; } if (waveT) clearInterval(waveT); let n = 0; set({ wave: 'wave1' }); waveT = setInterval(() => { n++; if (n >= 6){ clearInterval(waveT); waveT = null; set({ wave: null }); return; } set({ wave: n % 2 ? 'wave2' : 'wave1' }); }, 220); });
+  q('#vhMe').addEventListener('click', () => { if (window.ClayCreator && LIVE.on){ ClayCreator.open(() => LIVE.rebuild && LIVE.rebuild()); return; } if (LIVE.on){ LIVE.wave = performance.now() / 1000; return; } if (waveT) clearInterval(waveT); let n = 0; set({ wave: 'wave1' }); waveT = setInterval(() => { n++; if (n >= 6){ clearInterval(waveT); waveT = null; set({ wave: null }); return; } set({ wave: n % 2 ? 'wave2' : 'wave1' }); }, 220); });
   let lastWheel = 0;
   root.addEventListener('wheel', e => { if (st.open !== null) return; const now = Date.now(); if (now - lastWheel < 450 || Math.abs(e.deltaY) < 8) return; lastWheel = now; go(e.deltaY > 0 ? 1 : -1); }, { passive: true });
   addEventListener('keydown', e => {
@@ -4136,12 +4136,14 @@ window.WuvvTee = (function () {
     if (!T || !AV || !AV.make || !window.ClayFigure){ if ((n || 0) < 120) setTimeout(() => liveFigure((n || 0) + 1), 500); return; }
     if (!window.WuvvTee && window.__wuvvTeeInit) try { window.__wuvvTeeInit(); } catch (e) { console.warn('wuvv tee init', e); }
     const btn = q('#vhMe'), im = q('#vhMeImg'), W = 427, H = 640;
-    let av; try { av = AV.make(AV.specs({ players: 1 }, 1)[0], { height: 1.8, shirt: '#74E0CF' }); } catch (e) { console.warn('home figure', e); return; }
+    const mk = () => { const L = window.ClayFigure && ClayFigure.lookFor ? ClayFigure.lookFor(0, null) : null; return AV.make(AV.specs({ players: 1 }, 1)[0], { height: 1.8, shirt: L ? L.tee : '#74E0CF' }); };
+    let av; try { av = mk(); } catch (e) { console.warn('home figure', e); return; }
     const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2; cv.style.cssText = `width:${W}px;height:${H}px;display:none;pointer-events:none`;
     btn.insertBefore(cv, im);
     const r = new T.WebGLRenderer({ canvas: cv, alpha: true, antialias: true }); r.setPixelRatio(1); r.setSize(W * 2, H * 2, false);
     const sc = new T.Scene(); sc.add(new T.HemisphereLight(0xffffff, 0x445566, 1.1)); const dl = new T.DirectionalLight(0xffffff, 0.6); dl.position.set(1, 2, 3); sc.add(dl);
     sc.add(av.root);
+    LIVE.rebuild = () => { try { const n = mk(); sc.remove(av.root); try { av.dispose(); } catch (_) {} av = n; sc.add(av.root); LIVE.wave = performance.now() / 1000 + 0.6; } catch (e) { console.warn('home figure', e); } };
     const cam = new T.PerspectiveCamera(24, W / H, 0.1, 50); cam.position.set(0, 0.98, 5.1); cam.lookAt(0, 0.92, 0);
     const V = new T.Vector3(), Q = new T.Quaternion(), Q2 = new T.Quaternion();
     function aimW(bone, rest, dirW, w){ bone.parent.getWorldQuaternion(Q); V.copy(dirW).normalize().applyQuaternion(Q.invert()); Q2.setFromUnitVectors(rest, V); bone.quaternion.slerp(Q2, w); bone.updateMatrixWorld(true); }
@@ -4192,6 +4194,158 @@ window.WuvvTee = (function () {
   hookFrames(); new MutationObserver(hookFrames).observe(document.body, { childList: true, subtree: true });
   const boot = document.getElementById('vhBoot'); if (boot) boot.remove();
   window.VintageHome = { open: id => { const i = LIST.findIndex(g => g.id === id || g.page === id); if (i >= 0) openGame(i); }, list: LIST };
+})();
+
+/* Clayhouse character creator: opens from your figure on the home screen. A big live preview on the left, sticker tabs
+   and hand-sized choices on the right. Saves to localStorage 'clayhouse.figure' (ClayFigure.lookFor reads it), so the
+   same look shows up on the home screen and as Player 1 in every game. */
+window.ClayCreator = (function () {
+  const KEY = 'clayhouse.figure';
+  let built = false, ov, stage, look, saved, tab = 'body', av = null, r = null, sc = null, cam = null, yaw = 0, raf = 0, last = 0, onSave = null, zoom = 0;
+  const $ = s => ov.querySelector(s);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const CF = () => window.ClayFigure, D = () => CF().data;
+  const rgb = a => `rgb(${a.map(v => v <= 1 ? Math.round(Math.pow(v, 1 / 2.2) * 255) : v).join(',')})`;
+  const TABS = [['body', 'Body'], ['skin', 'Skin'], ['face', 'Face'], ['eyes', 'Eyes'], ['brows', 'Brows & lips'], ['hair', 'Hair'], ['facial', 'Facial hair'], ['extras', 'Extras'], ['outfit', 'Outfit']];
+  const HEADTABS = { face: 1, eyes: 1, brows: 1, hair: 1, facial: 1, extras: 1 };
+  const PANTS = ['#2f4266', '#2b2b30', '#7e9bc6', '#c9b49a', '#4a5d3a', '#6b5a48', '#efe6d2', '#7a1f2b'];
+  const SHOES = ['#e0583a', '#c75b7a', '#2fb39a', '#f2c230', '#3a6ea8', '#7a3fb5', '#1b1b1b', '#f3f0e8'];
+
+  function css(){
+    return `
+#vhCreator{position:absolute;inset:0;z-index:600;background:repeating-conic-gradient(from 0deg at 22% 62%,rgba(255,240,200,0.06) 0deg 7deg,rgba(0,0,0,0) 7deg 14deg),#2B5A97;display:none;font-family:'Oswald','Arial Narrow',sans-serif;color:#F3E6C8}
+#vhCreator.on{display:block}
+#vhCreator .cr-prev{position:absolute;left:250px;top:40px;width:620px;height:1000px;border-radius:34px;background:radial-gradient(ellipse at 50% 92%,rgba(5,10,30,.45),rgba(5,10,30,0) 40%),linear-gradient(#F6C343 0 0) 0 0/0 0;}
+#vhCreator .cr-prev canvas{position:absolute;inset:0;width:100%;height:100%;cursor:grab}
+#vhCreator .cr-title{position:absolute;left:0;top:18px;font-family:'Bungee',sans-serif;font-size:64px;color:#F6C343;-webkit-text-stroke:2px #1B1B1B;text-shadow:3px 3px 0 #B5541E,6px 6px 0 #1B1B1B;pointer-events:none}
+#vhCreator .cr-turn{position:absolute;bottom:40px;display:flex;gap:16px;left:50%;transform:translateX(-50%)}
+#vhCreator .cr-side{position:absolute;left:900px;top:40px;right:40px;bottom:40px;display:flex;flex-direction:column;gap:22px}
+#vhCreator .cr-tabs{display:flex;flex-wrap:wrap;gap:12px}
+#vhCreator .cr-tab{height:66px;padding:0 24px;border-radius:999px;font-family:'Bungee',sans-serif;font-size:19px}
+#vhCreator .cr-tab.on{background:#D8402B;color:#F3E6C8}
+#vhCreator .cr-panel{flex:1;overflow:auto;border-radius:28px;padding:28px 30px;background:rgba(20,22,48,.35);border:3px solid #1B1B1B}
+#vhCreator .cr-h{font-family:'Bungee',sans-serif;font-size:22px;letter-spacing:1px;margin:6px 0 14px;color:#F6C343;text-shadow:2px 2px 0 #1B1B1B}
+#vhCreator .cr-grid{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:26px}
+#vhCreator .cr-opt{min-width:132px;height:92px;padding:0 20px;border-radius:20px;font-family:'Bungee',sans-serif;font-size:18px;display:flex;align-items:center;justify-content:center;gap:10px}
+#vhCreator .cr-opt.on{outline:6px solid #F6C343;outline-offset:2px}
+#vhCreator .cr-sw{width:92px;height:92px;min-width:0;padding:0;border-radius:50%}
+#vhCreator .cr-sl{display:grid;grid-template-columns:200px 92px 1fr 92px;gap:14px;align-items:center;margin-bottom:12px;font-size:20px;font-weight:600}
+#vhCreator .cr-sl button{height:72px;border-radius:18px;font-family:'Bungee',sans-serif;font-size:30px}
+#vhCreator .cr-bar{height:16px;border-radius:999px;background:rgba(243,230,200,.25);position:relative;border:2px solid #1B1B1B}
+#vhCreator .cr-bar i{position:absolute;top:-9px;width:30px;height:30px;border-radius:50%;background:#F6C343;border:3px solid #1B1B1B;transform:translateX(-50%)}
+#vhCreator .cr-foot{display:flex;gap:16px;justify-content:flex-end}
+#vhCreator .cr-foot button{height:96px;padding:0 40px;border-radius:28px;font-family:'Bungee',sans-serif;font-size:26px}
+#vhCreator .cr-lock{border:3px dashed rgba(243,230,200,.6);border-radius:22px;padding:20px 24px;font-size:20px;line-height:1.35;margin-bottom:26px}
+#vhCreator .cr-lock b{font-family:'Bungee',sans-serif;font-weight:400;color:#F6C343}`;
+  }
+  function build(){
+    stage = document.querySelector('#vh .stage'); if (!stage) return false;
+    const st = document.createElement('style'); st.textContent = css(); document.head.appendChild(st);
+    ov = document.createElement('section'); ov.id = 'vhCreator'; ov.setAttribute('aria-label', 'Character creator');
+    ov.innerHTML = `<div class="cr-prev"><canvas width="1240" height="2000"></canvas><div class="cr-title">Make you</div>
+      <div class="cr-turn"><button class="glass cr-tab" data-hand data-turn="-1" type="button">◀ Turn</button><button class="glass cr-tab" data-hand data-turn="1" type="button">Turn ▶</button></div></div>
+      <div class="cr-side"><div class="cr-tabs">${TABS.map(([k, l]) => `<button class="glass cr-tab" type="button" data-hand data-tab="${k}">${l}</button>`).join('')}</div>
+      <div class="cr-panel" id="crPanel"></div>
+      <div class="cr-foot"><button class="glass" data-hand id="crRand" type="button">Surprise me</button><button class="glass" data-hand id="crBack" type="button">Cancel</button><button class="btn-red" data-hand id="crDone" type="button">Save</button></div></div>`;
+    stage.appendChild(ov);
+    ov.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.tab){ tab = b.dataset.tab; panel(); return; }
+      if (b.dataset.turn){ yaw += +b.dataset.turn * 0.6; return; }
+      if (b.id === 'crDone') return close(true);
+      if (b.id === 'crBack') return close(false);
+      if (b.id === 'crRand') return surprise();
+      if (b.dataset.k){ const k = b.dataset.k; let v = b.dataset.v; v = /^-?\d+$/.test(v) ? +v : v;
+        if (k === 'preset'){ look.shape = Object.assign({}, (D().presets[v] || {}).v || {}); }
+        else if (k.startsWith('s:')){ const s = k.slice(2); look.shape = Object.assign({}, look.shape); look.shape[s] = Math.max(-1, Math.min(1, Math.round(((look.shape[s] || 0) + v * 0.25) * 100) / 100)); }
+        else look[k] = v;
+        panel(); remake(); }
+    });
+    // drag to turn the figure
+    const cv = $('canvas'); let dx = null;
+    cv.addEventListener('pointerdown', e => { dx = e.clientX; cv.setPointerCapture(e.pointerId); });
+    cv.addEventListener('pointermove', e => { if (dx == null) return; yaw += (e.clientX - dx) * 0.01; dx = e.clientX; });
+    cv.addEventListener('pointerup', () => { dx = null; });
+    built = true; return true;
+  }
+  const opt = (k, v, label, on, style) => `<button class="glass cr-opt${style ? ' cr-sw' : ''}${on ? ' on' : ''}" type="button" data-hand data-k="${k}" data-v="${v}"${style ? ` style="${style}" aria-label="${esc(label)}" title="${esc(label)}"` : ''}>${style ? '' : esc(label)}</button>`;
+  function slider(key, label){
+    const v = look.shape[key] || 0;
+    return `<div class="cr-sl"><span>${esc(label)}</span><button class="glass" type="button" data-hand data-k="s:${key}" data-v="-1" aria-label="Less ${esc(label)}">−</button><div class="cr-bar"><i style="left:${(v + 1) * 50}%"></i></div><button class="glass" type="button" data-hand data-k="s:${key}" data-v="1" aria-label="More ${esc(label)}">+</button></div>`;
+  }
+  function panel(){
+    ov.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+    const d = D(), L = look; let h = '';
+    if (tab === 'body') h = `<div class="cr-h">Body type</div><div class="cr-grid">${opt('base', 'male', 'Body type 1', L.base === 'male')}${opt('base', 'female', 'Body type 2', L.base === 'female')}</div>`;
+    if (tab === 'skin') h = `<div class="cr-h">Skin tone</div><div class="cr-grid">${d.tones.map((t, i) => opt('tone', i, t.name, L.tone === i, `background:${rgb(t.rgb)}`)).join('')}</div>`;
+    if (tab === 'face') h = `<div class="cr-h">Start from</div><div class="cr-grid">${d.presets.map((p, i) => opt('preset', i, p.label, false)).join('')}</div>
+      <div class="cr-h">Shape</div>${d.shapes.filter(s => s.key !== 'old').map(s => slider(s.key, s.label)).join('')}`;
+    if (tab === 'eyes') h = `<div class="cr-h">Eye color</div><div class="cr-grid">${d.eyeColors.map((c, i) => opt('eye', i, c.name, L.eye === i, `background:${rgb(c.rgb)}`)).join('')}</div>
+      <div class="cr-h">Lashes</div><div class="cr-grid">${opt('liner', 0, 'None', L.liner === 0)}${opt('liner', 1, 'Soft', L.liner === 1)}${opt('liner', 2, 'Bold', L.liner === 2)}</div>
+      <div class="cr-h">Eyes</div>${slider('eye', 'Eye size')}${slider('esp', 'Eye spacing')}${slider('eyeTilt', 'Eye tilt')}`;
+    if (tab === 'brows') h = `<div class="cr-h">Brows</div><div class="cr-grid">${[0, 1, 2, 3, 4].map(i => opt('brow', i, 'Style ' + (i + 1), L.brow === i)).join('')}</div>
+      <div class="cr-h">Brow color</div><div class="cr-grid">${opt('browC', -1, 'Match hair', L.browC === -1)}${d.hairColors.map((c, i) => opt('browC', i, c.name, L.browC === i, `background:${rgb(c.rgb)}`)).join('')}</div>
+      <div class="cr-h">Lip color</div><div class="cr-grid">${opt('lip', -1, 'Natural', L.lip === -1)}${d.lipTints.map((c, i) => opt('lip', i, c.name, L.lip === i, `background:${rgb(c.rgb)}`)).join('')}</div>
+      <div class="cr-h">Lips</div>${slider('lips', 'Fullness')}${slider('lipW', 'Width')}`;
+    if (tab === 'hair') h = `<div class="cr-h">Style</div><div class="cr-grid">${d.hairs.map(x => opt('hair', x.key, x.label, L.hair === x.key)).join('')}</div>
+      <div class="cr-h">Color</div><div class="cr-grid">${d.hairColors.map((c, i) => opt('hairC', i, c.name, L.hairC === i, `background:${rgb(c.rgb)}`)).join('')}</div>`;
+    if (tab === 'facial') h = `<div class="cr-h">Facial hair</div><div class="cr-grid">${[['none', 'None'], ['stubble', 'Stubble'], ['mustache', 'Mustache'], ['goatee', 'Goatee'], ['beard', 'Beard']].map(([k, l]) => opt('facial', k, l, L.facial === k)).join('')}</div>
+      <div class="cr-h">Color</div><div class="cr-grid">${opt('facialC', -1, 'Match hair', L.facialC === -1)}${d.hairColors.map((c, i) => opt('facialC', i, c.name, L.facialC === i, `background:${rgb(c.rgb)}`)).join('')}</div>`;
+    if (tab === 'extras') h = `<div class="cr-h">Glasses</div><div class="cr-grid">${[['none', 'None'], ['round', 'Round'], ['rect', 'Square'], ['cat', 'Cat eye']].map(([k, l]) => opt('glasses', k, l, L.glasses === k)).join('')}</div>
+      <div class="cr-h">Earrings</div><div class="cr-grid">${[['none', 'None'], ['studs', 'Studs'], ['hoops', 'Hoops']].map(([k, l]) => opt('ears', k, l, L.ears === k)).join('')}</div>`;
+    if (tab === 'outfit') h = `<div class="cr-h">Shirt</div><div class="cr-lock"><b>Wuvv shirts</b><br>Shirts will be Wuvv pieces only. They land here once the shirt artwork is in.</div>
+      <div class="cr-h">Pants</div><div class="cr-grid">${PANTS.map(c => opt('pants', c, c, L.pants === c, `background:${c}`)).join('')}</div>
+      <div class="cr-h">Shoe accents</div><div class="cr-grid">${SHOES.map(c => opt('accent', c, c, L.accent === c, `background:${c}`)).join('')}</div>`;
+    $('#crPanel').innerHTML = h;
+  }
+  function surprise(){
+    const d = D(), pick = a => a[(Math.random() * a.length) | 0];
+    look.base = Math.random() < 0.5 ? 'male' : 'female'; look.tone = (Math.random() * d.tones.length) | 0; look.eye = (Math.random() * d.eyeColors.length) | 0;
+    look.hair = pick(d.hairs).key; look.hairC = (Math.random() * 6) | 0; look.brow = (Math.random() * 5) | 0; look.browC = -1;
+    look.facial = look.base === 'male' ? pick(['none', 'none', 'stubble', 'goatee', 'beard', 'mustache']) : 'none';
+    look.glasses = pick(['none', 'none', 'none', 'round', 'rect', 'cat']); look.ears = pick(['none', 'none', 'studs', 'hoops']);
+    look.liner = look.base === 'female' ? 1 + ((Math.random() * 2) | 0) : (Math.random() < 0.5 ? 0 : 1);
+    look.shape = Object.assign({}, pick(d.presets).v || {}); look.pants = pick(PANTS); look.accent = pick(SHOES);
+    panel(); remake();
+  }
+  // ---------- the live preview ----------
+  function remake(){
+    const T = window.THREE, AV = window.ClayAvatar; if (!T || !AV) return;
+    if (av){ try { av.dispose(); } catch (_) {} av = null; }
+    // the figure reads Player 1's saved look (body type included), so the draft is saved for the moment it is built
+    let prev = null; try { prev = localStorage.getItem(KEY); localStorage.setItem(KEY, JSON.stringify(look)); } catch (_) {}
+    try { av = AV.make(AV.specs({ players: 1 }, 1)[0], { height: 1.8, shirt: look.tee }); sc.add(av.root); } catch (e) { console.warn('creator figure', e); }
+    try { if (prev == null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, prev); } catch (_) {}
+  }
+  function loop(now){
+    raf = requestAnimationFrame(loop); const dt = Math.min(0.05, (now - last) / 1000 || 0), t = now / 1000; last = now;
+    if (!av) return;
+    av.root.rotation.y += (yaw - av.root.rotation.y) * (1 - Math.exp(-dt * 8));
+    if (av.update) av.update(dt, t);
+    if (av.play && av.hasAnim && av.hasAnim('Idle_Loop')){ av.play('Idle_Loop', {}); av.animate(dt); }
+    zoom += ((HEADTABS[tab] ? 1 : 0) - zoom) * (1 - Math.exp(-dt * 5));
+    const tgtY = 0.95 + 0.62 * zoom, dist = 5.0 - 3.6 * zoom;
+    cam.position.set(0, tgtY + 0.02, dist); cam.lookAt(0, tgtY, 0);
+    r.render(sc, cam);
+  }
+  function open(cb){
+    if (!built && !build()) return;
+    const T = window.THREE; if (!T || !CF()) return;
+    onSave = cb || null;
+    try { saved = localStorage.getItem(KEY); } catch (_) { saved = null; }
+    look = JSON.parse(JSON.stringify(CF().lookFor(0, null))); look.shape = look.shape || {};
+    if (!r){ const cv = $('canvas'); r = new T.WebGLRenderer({ canvas: cv, alpha: true, antialias: true }); r.setPixelRatio(1);
+      sc = new T.Scene(); sc.add(new T.HemisphereLight(0xffffff, 0x445566, 1.1)); const dl = new T.DirectionalLight(0xffffff, 0.6); dl.position.set(1, 2, 3); sc.add(dl);
+      cam = new T.PerspectiveCamera(24, 620 / 1000, 0.05, 50); }
+    yaw = 0; tab = 'body'; remake(); panel(); ov.classList.add('on');
+    last = performance.now(); cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
+  }
+  function close(save){
+    if (save){ try { localStorage.setItem(KEY, JSON.stringify(look)); } catch (_) {} if (onSave) try { onSave(look); } catch (_) {} }
+    ov.classList.remove('on'); cancelAnimationFrame(raf);
+    if (av){ try { av.dispose(); } catch (_) {} av = null; }
+  }
+  return { open, close, isOpen: () => !!(ov && ov.classList.contains('on')) };
 })();
 </script>
 
