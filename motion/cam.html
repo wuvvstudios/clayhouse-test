@@ -20,14 +20,14 @@ body{ padding:max(14px,env(safe-area-inset-top)) 16px max(20px,env(safe-area-ins
 label{ font-weight:700; font-size:15px; text-transform:uppercase; letter-spacing:1px }
 input{ width:100%; margin-top:6px; font:400 34px var(--disp); letter-spacing:10px; text-align:center; text-transform:uppercase; border:3px solid var(--ink); border-radius:12px; padding:8px; background:#fff; color:var(--blue) }
 .row{ display:flex; gap:10px; margin-top:12px }
-button{ flex:1; font:700 18px var(--ui); text-transform:uppercase; letter-spacing:1px; background:var(--gold); color:var(--ink); border:3px solid var(--ink); border-radius:999px; padding:12px 16px; box-shadow:3px 3px 0 var(--ink) }
+button{ flex:1 1 30%; font:700 18px var(--ui); text-transform:uppercase; letter-spacing:1px; background:var(--gold); color:var(--ink); border:3px solid var(--ink); border-radius:999px; padding:12px 16px; box-shadow:3px 3px 0 var(--ink) }
 button.ghost{ background:#fff }
 button:disabled{ opacity:.5 }
 .seg{ display:flex; border:3px solid var(--ink); border-radius:999px; overflow:hidden; margin-top:6px }
 .seg button{ border:0; border-radius:0; box-shadow:none; background:#fff; font-size:16px; padding:10px }
 .seg button.on{ background:var(--gold) }
 #view{ position:relative; width:100%; max-width:520px; border:3px solid var(--ink); border-radius:18px; overflow:hidden; background:#000; box-shadow:5px 5px 0 var(--ink) }
-#view video{ display:block; width:100%; height:auto }
+
 #badge{ position:absolute; left:10px; top:10px; font:700 15px var(--ui); text-transform:uppercase; letter-spacing:1px; padding:6px 12px; border-radius:999px; border:2px solid var(--ink); background:var(--cream); color:var(--ink) }
 #badge.live{ background:#3DDC84 }
 #st{ font-weight:700; font-size:18px; text-align:center; max-width:520px }
@@ -50,10 +50,12 @@ body.live.dim #view, body.live.dim .tips{ opacity:.15 }
   <div class="row"><button type="button" id="go">Start</button></div>
 </div>
 
-<div id="view" hidden><video id="v" playsinline muted autoplay></video><div id="badge">Connecting</div></div>
+<div id="view" hidden><video id="v" playsinline muted autoplay style="position:absolute;width:2px;height:2px;opacity:0;pointer-events:none"></video><canvas id="out" style="display:block;width:100%;height:auto"></canvas><div id="badge">Connecting</div></div>
 <div id="st"></div>
-<p class="tips" id="tips" hidden>Turn the phone sideways. Waist height, 8 to 10 feet back, everyone's feet in the picture. Keep it plugged in and leave this page open.</p>
-<div class="row" id="ctl" hidden style="width:100%;max-width:520px">
+<p class="tips" id="tips" hidden>Turn the phone sideways. Waist height, 8 to 10 feet back, everyone's feet in the picture. Keep it plugged in and leave this page open.<br>Picture upside down or sideways on the TV? Tap Rotate. Left and right swapped? Tap Mirror.</p>
+<div class="row" id="ctl" hidden style="width:100%;max-width:520px;flex-wrap:wrap">
+  <button type="button" class="ghost" id="rot">Rotate</button>
+  <button type="button" class="ghost" id="mir">Mirror</button>
   <button type="button" class="ghost" id="flip">Switch camera</button>
   <button type="button" class="ghost" id="dim">Dim screen</button>
   <button type="button" class="ghost" id="stop">Stop</button>
@@ -67,6 +69,29 @@ body.live.dim #view, body.live.dim .tips{ opacity:.15 }
   const clean = c => String(c || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
   const q = new URLSearchParams(location.search);
   let facing = localStorage.getItem('clayCamFacing') || 'environment';
+  // the TV gets this canvas, not the raw camera, so the picture can be turned and mirrored to come out right on the TV
+  const cv = $('out'), cx = cv.getContext('2d');
+  let rot = +(localStorage.getItem('clayCamRot') || 0), mir = localStorage.getItem('clayCamMir') === '1', out = null, drawing = false;
+  function draw(){
+    const v = $('v');
+    if (v.videoWidth){
+      const side = rot % 180 !== 0, W = side ? v.videoHeight : v.videoWidth, H = side ? v.videoWidth : v.videoHeight;
+      if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
+      cx.setTransform(1, 0, 0, 1, 0, 0);
+      cx.translate(W / 2, H / 2); cx.rotate(rot * Math.PI / 180); if (mir) cx.scale(-1, 1);
+      cx.drawImage(v, -v.videoWidth / 2, -v.videoHeight / 2);
+    }
+    if (!drawing) return;
+    if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(draw); else requestAnimationFrame(draw);
+  }
+  function startDraw(){
+    if (drawing) return; drawing = true;
+    const v = $('v'); if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(draw); else requestAnimationFrame(draw);
+  }
+  const showSet = () => { $('rot').textContent = 'Rotate ' + rot + '°'; $('mir').textContent = mir ? 'Mirror on' : 'Mirror'; };
+  $('rot').onclick = () => { rot = (rot + 90) % 360; localStorage.setItem('clayCamRot', rot); showSet(); };
+  $('mir').onclick = () => { mir = !mir; localStorage.setItem('clayCamMir', mir ? '1' : '0'); showSet(); };
+  showSet();
   let stream = null, peer = null, call = null, code = '', running = false, retryT = 0, wake = null;
   $('code').value = clean(q.get('c') || localStorage.getItem('clayCamCode') || '');
   const setSeg = () => { $('back').classList.toggle('on', facing === 'environment'); $('front').classList.toggle('on', facing === 'user'); };
@@ -96,7 +121,12 @@ body.live.dim #view, body.live.dim .tips{ opacity:.15 }
     $('go').disabled = true; status('Starting the camera…');
     try { stream = await getCam(); }
     catch (e){ $('go').disabled = false; status(e && e.name === 'NotAllowedError' ? 'Camera blocked. Allow camera access for this site in your browser settings, then tap Start again.' : 'Could not start the camera. Close other apps using it and try again.'); return; }
-    $('v').srcObject = stream; $('v').play().catch(() => {});
+    $('v').srcObject = stream; await $('v').play().catch(() => {});
+    if (!out){
+      for (let i = 0; i < 40 && !$('v').videoWidth; i++) await new Promise(r => setTimeout(r, 50));
+      startDraw(); draw();
+      out = cv.captureStream ? cv.captureStream(30) : stream;   // very old browsers: send the raw camera
+    }
     $('view').hidden = false; $('tips').hidden = false; $('ctl').hidden = false; document.body.classList.add('live');
     running = true; keepAwake(); connect();
   };
@@ -117,7 +147,7 @@ body.live.dim #view, body.live.dim .tips{ opacity:.15 }
     if (!running || !peer || peer.disconnected || !stream) return;
     clearTimeout(retryT);
     try { call && call.close(); } catch (_) {}
-    const c = peer.call(PRE + code, stream);
+    const c = peer.call(PRE + code, out || stream);
     if (!c){ later(); return; }
     call = c;
     // keep the frame rate smooth over a sharp picture: motion matters more than detail
@@ -139,11 +169,12 @@ body.live.dim #view, body.live.dim .tips{ opacity:.15 }
   $('flip').onclick = async () => {
     facing = facing === 'environment' ? 'user' : 'environment'; localStorage.setItem('clayCamFacing', facing);
     try {
-      const ns = await getCam(); const old = stream; stream = ns; $('v').srcObject = ns;
-      const nt = ns.getVideoTracks()[0];
-      let swapped = false;
-      try { call && call.peerConnection.getSenders().forEach(s => { if (s.track && s.track.kind === 'video'){ s.replaceTrack(nt); swapped = true; } }); } catch (_) {}
-      if (!swapped) dial();
+      const ns = await getCam(); const old = stream; stream = ns; $('v').srcObject = ns; $('v').play().catch(() => {});
+      if (!out || out === old){   // no canvas: hand the new camera to the call
+        out = ns; let swapped = false;
+        try { call && call.peerConnection.getSenders().forEach(s => { if (s.track && s.track.kind === 'video'){ s.replaceTrack(ns.getVideoTracks()[0]); swapped = true; } }); } catch (_) {}
+        if (!swapped) dial();
+      }
       if (old) old.getTracks().forEach(t => t.stop());
     } catch (_) { status('Could not switch cameras.'); }
   };
@@ -153,7 +184,8 @@ body.live.dim #view, body.live.dim .tips{ opacity:.15 }
     try { call && call.close(); } catch (_) {} try { peer && peer.destroy(); } catch (_) {}
     if (stream) stream.getTracks().forEach(t => t.stop());
     try { wake && wake.release(); } catch (_) {}
-    call = peer = stream = null; $('go').disabled = false;
+    drawing = false; try { out && out.getTracks().forEach(t => t.stop()); } catch (_) {}
+    call = peer = stream = out = null; $('go').disabled = false;
     document.body.classList.remove('live', 'dim'); $('view').hidden = $('tips').hidden = $('ctl').hidden = true; status('Stopped.');
   };
   if (q.get('c') && clean(q.get('c')).length === 4) status('Code filled in from the TV. Tap Start.');
