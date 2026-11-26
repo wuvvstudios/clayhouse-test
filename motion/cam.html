@@ -71,7 +71,7 @@ body.live.dim #view, body.live.dim .tips{ opacity:.15 }
   let facing = localStorage.getItem('clayCamFacing') || 'environment';
   // the TV gets this canvas, not the raw camera, so the picture can be turned and mirrored to come out right on the TV
   const cv = $('out'), cx = cv.getContext('2d');
-  let rot = +(localStorage.getItem('clayCamRot') || 0), mir = localStorage.getItem('clayCamMir') === '1', out = null, drawing = false;
+  let rot = +(localStorage.getItem('clayCamRot') || 0), mir = false, out = null, drawing = false;
   function draw(){
     const v = $('v');
     if (v.videoWidth){
@@ -90,7 +90,10 @@ body.live.dim #view, body.live.dim .tips{ opacity:.15 }
   }
   const showSet = () => { $('rot').textContent = 'Rotate ' + rot + '°'; $('mir').textContent = mir ? 'Mirror on' : 'Mirror'; };
   $('rot').onclick = () => { rot = (rot + 90) % 360; localStorage.setItem('clayCamRot', rot); showSet(); };
-  $('mir').onclick = () => { mir = !mir; localStorage.setItem('clayCamMir', mir ? '1' : '0'); showSet(); };
+  // the back camera sees the players flipped compared with a webcam, so it is mirrored by default; each camera keeps its own setting
+  const mirFor = f => { const v = localStorage.getItem('clayCamMir2_' + f); return v === null ? f === 'environment' : v === '1'; };
+  mir = mirFor(facing);
+  $('mir').onclick = () => { mir = !mir; localStorage.setItem('clayCamMir2_' + facing, mir ? '1' : '0'); showSet(); };
   showSet();
   let stream = null, peer = null, call = null, code = '', running = false, retryT = 0, wake = null;
   $('code').value = clean(q.get('c') || localStorage.getItem('clayCamCode') || '');
@@ -116,7 +119,7 @@ body.live.dim #view, body.live.dim .tips{ opacity:.15 }
   $('go').onclick = async () => {
     code = clean($('code').value);
     if (code.length !== 4){ status('Type the 4-letter code shown on the TV.'); return; }
-    localStorage.setItem('clayCamCode', code); localStorage.setItem('clayCamFacing', facing);
+    localStorage.setItem('clayCamCode', code); localStorage.setItem('clayCamFacing', facing); mir = mirFor(facing); showSet();
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ status('This browser cannot use the camera. Open the page in Safari or Chrome.'); return; }
     $('go').disabled = true; status('Starting the camera…');
     try { stream = await getCam(); }
@@ -167,7 +170,7 @@ body.live.dim #view, body.live.dim .tips{ opacity:.15 }
   }
 
   $('flip').onclick = async () => {
-    facing = facing === 'environment' ? 'user' : 'environment'; localStorage.setItem('clayCamFacing', facing);
+    facing = facing === 'environment' ? 'user' : 'environment'; localStorage.setItem('clayCamFacing', facing); mir = mirFor(facing); showSet();
     try {
       const ns = await getCam(); const old = stream; stream = ns; $('v').srcObject = ns; $('v').play().catch(() => {});
       if (!out || out === old){   // no canvas: hand the new camera to the call
